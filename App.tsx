@@ -36,23 +36,35 @@ const App: React.FC = () => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Load data from central localStorage
+  // Load data from central localStorage safely
   useEffect(() => {
-    const savedUsers = localStorage.getItem('sip_gym_users_db');
-    const savedPromos = localStorage.getItem('sip_gym_promos_db');
-    
-    if (savedUsers) {
-      const users = JSON.parse(savedUsers);
-      setAllUsers(users);
+    try {
+      const savedUsers = localStorage.getItem('sip_gym_users_db');
+      const savedPromos = localStorage.getItem('sip_gym_promos_db');
       
-      const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
-      if (loggedPhone) {
-        const user = users.find((u: UserProfile) => u.phone === loggedPhone);
-        if (user) setCurrentUser(user);
+      if (savedUsers) {
+        const users = JSON.parse(savedUsers);
+        if (Array.isArray(users)) {
+          setAllUsers(users);
+          
+          const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
+          if (loggedPhone) {
+            const user = users.find((u: UserProfile) => u.phone === loggedPhone);
+            if (user) setCurrentUser(user);
+          }
+        }
       }
-    }
 
-    if (savedPromos) setPromotions(JSON.parse(savedPromos));
+      if (savedPromos) {
+        const promos = JSON.parse(savedPromos);
+        if (Array.isArray(promos)) setPromotions(promos);
+      }
+    } catch (error) {
+      console.error("Lỗi khi đọc dữ liệu LocalStorage:", error);
+      // Reset if data is corrupted
+      localStorage.removeItem('sip_gym_users_db');
+      localStorage.removeItem('sip_gym_promos_db');
+    }
   }, []);
 
   const syncDB = (newUsers: UserProfile[]) => {
