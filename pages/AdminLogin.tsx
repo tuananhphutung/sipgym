@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Lock, User, Zap } from 'lucide-react';
+import { ShieldCheck, Lock, User } from 'lucide-react';
 
 const AdminLogin: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -17,11 +17,6 @@ const AdminLogin: React.FC = () => {
     } else {
       setError('Sai tài khoản hoặc mật khẩu!');
     }
-  };
-
-  const quickLogin = () => {
-    localStorage.setItem('admin_logged', 'true');
-    navigate('/admin/dashboard');
   };
 
   return (
@@ -68,19 +63,6 @@ const AdminLogin: React.FC = () => {
             Đăng Nhập Hệ Thống
           </button>
         </form>
-
-        <div className="relative my-8">
-           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
-           <div className="relative flex justify-center text-[10px] uppercase font-black text-slate-600"><span className="bg-slate-900 px-4">Hoặc xem nhanh</span></div>
-        </div>
-
-        <button
-          onClick={quickLogin}
-          className="w-full bg-slate-800 hover:bg-slate-700 text-blue-400 py-4 rounded-2xl font-black text-sm transition-all uppercase flex items-center justify-center gap-2 border border-slate-700"
-        >
-          <Zap className="w-4 h-4 fill-blue-400" />
-          Đăng nhập Demo (Dành cho bạn)
-        </button>
       </div>
       
       <button onClick={() => navigate('/')} className="mt-8 text-slate-500 font-bold text-sm hover:text-white transition-colors">

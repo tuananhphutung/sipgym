@@ -15,7 +15,8 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
   const navigate = useNavigate();
   const [showNotiModal, setShowNotiModal] = useState(false);
 
-  const unreadNotifications = user?.notifications.filter(n => !n.read) || [];
+  // SAFE ACCESS: Thêm ? và || [] để tránh crash nếu user.notifications undefined
+  const unreadNotifications = user?.notifications?.filter(n => !n.read) || [];
   const unreadCount = unreadNotifications.length;
 
   // Tính số ngày còn lại
@@ -34,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
       if (u.phone === user.phone) {
         return {
           ...u,
-          notifications: u.notifications.map(n => n.id === id ? { ...n, read: true } : n)
+          notifications: (u.notifications || []).map(n => n.id === id ? { ...n, read: true } : n)
         };
       }
       return u;
@@ -100,13 +101,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
             </div>
             
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-6">
-              {user?.notifications.length === 0 ? (
+              {(!user?.notifications || user.notifications.length === 0) ? (
                 <div className="text-center py-10 opacity-40">
                    <Bell className="w-12 h-12 mx-auto mb-2" />
                    <p className="font-bold text-sm uppercase">Chưa có thông báo nào</p>
                 </div>
               ) : (
-                user?.notifications.slice().reverse().map((noti) => (
+                [...(user.notifications)].reverse().map((noti) => (
                   <div 
                     key={noti.id} 
                     onClick={() => !noti.read && markAsRead(noti.id)}

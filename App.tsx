@@ -101,35 +101,49 @@ const AppContent: React.FC = () => {
     }, 1500);
 
     // 1. Users
-    dbService.subscribe('users', (data: UserProfile[]) => {
-      setAllUsers(data || []);
+    dbService.subscribe('users', (data: any) => {
+      // CRITICAL FIX: Convert Firebase Object/Map to Array & Ensure sub-arrays exist
+      const rawList = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+      const sanitizedUsers: UserProfile[] = rawList.map((u: any) => ({
+        ...u,
+        notifications: Array.isArray(u.notifications) ? u.notifications : (u.notifications ? Object.values(u.notifications) : []),
+        messages: Array.isArray(u.messages) ? u.messages : (u.messages ? Object.values(u.messages) : []),
+        trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : [])
+      }));
+
+      setAllUsers(sanitizedUsers);
+      
       // Update current user realtime
       const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
-      if (loggedPhone && data) {
-        const user = data.find(u => u.phone === loggedPhone);
+      if (loggedPhone) {
+        const user = sanitizedUsers.find(u => u.phone === loggedPhone);
         if (user) setCurrentUser(user);
       }
       setIsLoading(false);
     });
 
     // 2. Promotions
-    dbService.subscribe('promos', (data: Promotion[]) => {
-      if (data && data.length > 0) setPromotions(data);
+    dbService.subscribe('promos', (data: any) => {
+      const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+      if (list.length > 0) setPromotions(list as Promotion[]);
     });
 
     // 3. Vouchers
-    dbService.subscribe('vouchers', (data: VoucherItem[]) => {
-      if (data && data.length > 0) setVouchers(data);
+    dbService.subscribe('vouchers', (data: any) => {
+      const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+      if (list.length > 0) setVouchers(list as VoucherItem[]);
     });
 
     // 4. Trainers
-    dbService.subscribe('trainers', (data: Trainer[]) => {
-      if (data && data.length > 0) setTrainers(data);
+    dbService.subscribe('trainers', (data: any) => {
+      const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+      if (list.length > 0) setTrainers(list as Trainer[]);
     });
 
     // 5. Programs
-    dbService.subscribe('programs', (data: TrainingProgram[]) => {
-      if (data && data.length > 0) setPrograms(data);
+    dbService.subscribe('programs', (data: any) => {
+      const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+      if (list.length > 0) setPrograms(list as TrainingProgram[]);
     });
 
     return () => clearTimeout(timer);
