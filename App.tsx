@@ -3,24 +3,47 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import Profile from './pages/Profile';
+import TrainingSchedule from './pages/TrainingSchedule';
+import Voucher from './pages/Voucher';
+import Support from './pages/Support';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import BottomNav from './components/BottomNav';
 import AuthModal from './components/AuthModal';
+import PWAPrompt from './components/PWAPrompt';
+import { dbService } from './services/firebase';
 
 export interface Subscription {
   name: string;
   months: number;
   expireDate: number | null;
+  startDate: number;
+  price: number;
   status: 'Pending' | 'Active' | 'Expired' | 'Rejected';
+}
+
+export interface Notification {
+  id: string;
+  text: string;
+  date: number;
+  read: boolean;
+}
+
+export interface ChatMessage {
+  sender: 'user' | 'admin';
+  text: string;
+  timestamp: number;
 }
 
 export interface UserProfile {
   phone: string;
+  name?: string; 
   avatar: string | null;
   subscription: Subscription | null;
   isLocked: boolean;
-  notifications: { id: string; text: string; date: number; read: boolean }[];
+  notifications: Notification[];
+  messages: ChatMessage[]; 
+  trainingDays: string[]; 
 }
 
 export interface Promotion {
@@ -30,56 +53,131 @@ export interface Promotion {
   date: number;
 }
 
+export interface VoucherItem {
+  id: string;
+  title: string;
+  code: string;
+  type: string;
+  color: string;
+}
+
+export interface Trainer {
+  id: string;
+  name: string;
+  specialty: string;
+  image: string;
+  rating: number;
+}
+
+export interface TrainingProgram {
+  id: string;
+  title: string;
+  duration: string;
+  image: string;
+}
+
 const AppContent: React.FC = () => {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [vouchers, setVouchers] = useState<VoucherItem[]>([
+    { id: '1', title: 'Giảm 20% Gói Gym 3 tháng', code: 'SIPGYM20', type: 'Gym', color: 'bg-blue-500' },
+    { id: '2', title: 'Tặng 1 buổi PT miễn phí', code: 'FREEPT', type: 'Gift', color: 'bg-green-500' }
+  ]);
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [programs, setPrograms] = useState<TrainingProgram[]>([]);
+  
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Loading state for async DB
   const location = useLocation();
 
   const isAdminPath = location.pathname.startsWith('/admin');
 
+  // Load & Subscribe Data
   useEffect(() => {
-    try {
-      const savedUsers = localStorage.getItem('sip_gym_users_db');
-      const savedPromos = localStorage.getItem('sip_gym_promos_db');
-      
-      if (savedUsers) {
-        const users = JSON.parse(savedUsers);
-        if (Array.isArray(users)) {
-          setAllUsers(users);
-          const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
-          if (loggedPhone) {
-            const user = users.find((u: UserProfile) => u.phone === loggedPhone);
-            if (user) setCurrentUser(user);
-          }
-        }
+    // FIX LOADING STUCK: Tự động tắt loading sau 1.5s bất kể Firebase có kết nối được hay không
+    const timer = setTimeout(() => {
+        setIsLoading(false);
+    }, 1500);
+
+    // 1. Users
+    dbService.subscribe('users', (data: UserProfile[]) => {
+      setAllUsers(data || []);
+      // Update current user realtime
+      const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
+      if (loggedPhone && data) {
+        const user = data.find(u => u.phone === loggedPhone);
+        if (user) setCurrentUser(user);
       }
-      if (savedPromos) {
-        const promos = JSON.parse(savedPromos);
-        if (Array.isArray(promos)) setPromotions(promos);
-      }
-    } catch (error) {
-      console.error("Error loading data:", error);
-    }
+      setIsLoading(false);
+    });
+
+    // 2. Promotions
+    dbService.subscribe('promos', (data: Promotion[]) => {
+      if (data && data.length > 0) setPromotions(data);
+    });
+
+    // 3. Vouchers
+    dbService.subscribe('vouchers', (data: VoucherItem[]) => {
+      if (data && data.length > 0) setVouchers(data);
+    });
+
+    // 4. Trainers
+    dbService.subscribe('trainers', (data: Trainer[]) => {
+      if (data && data.length > 0) setTrainers(data);
+    });
+
+    // 5. Programs
+    dbService.subscribe('programs', (data: TrainingProgram[]) => {
+      if (data && data.length > 0) setPrograms(data);
+    });
+
+    return () => clearTimeout(timer);
   }, []);
 
+  // Write Functions
   const syncDB = (newUsers: UserProfile[]) => {
-    setAllUsers(newUsers);
-    localStorage.setItem('sip_gym_users_db', JSON.stringify(newUsers));
-    if (currentUser) {
-      const updatedMe = newUsers.find(u => u.phone === currentUser.phone);
-      if (updatedMe) setCurrentUser(updatedMe);
-    }
+    setAllUsers(newUsers); // Optimistic UI update
+    dbService.saveAll('users', newUsers);
+  };
+
+  const syncVouchers = (newVouchers: VoucherItem[]) => {
+    setVouchers(newVouchers);
+    dbService.saveAll('vouchers', newVouchers);
+  };
+
+  const syncPromos = (newPromos: Promotion[]) => {
+    setPromotions(newPromos);
+    dbService.saveAll('promos', newPromos);
+  };
+  
+  const syncTrainers = (newTrainers: Trainer[]) => {
+    setTrainers(newTrainers);
+    dbService.saveAll('trainers', newTrainers);
   };
 
   const handleLogin = (phone: string) => {
     let users = [...allUsers];
     let user = users.find(u => u.phone === phone);
     if (!user) {
-      user = { phone, avatar: null, subscription: null, isLocked: false, notifications: [] };
+      user = { 
+        phone, 
+        name: `Member ${phone.slice(-4)}`,
+        avatar: null, 
+        subscription: null, 
+        isLocked: false, 
+        notifications: [], 
+        messages: [],
+        trainingDays: [] 
+      };
       users.push(user);
     }
+    
+    if (user.isLocked) {
+      alert("Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ Admin.");
+      return;
+    }
+
     localStorage.setItem('sip_gym_logged_phone', phone);
     setCurrentUser(user);
     syncDB(users);
@@ -91,77 +189,86 @@ const AppContent: React.FC = () => {
     setCurrentUser(null);
   };
 
-  const updateSubscriptionRequest = (packageName: string, months: number) => {
+  const handleUpdateSubscription = (packageName: string, months: number, price: number) => {
     if (!currentUser) return;
-    const users = allUsers.map(u => {
+
+    const newSubscription: Subscription = {
+      name: packageName,
+      months: months,
+      expireDate: null,
+      startDate: Date.now(),
+      price: price,
+      status: 'Pending'
+    };
+
+    const newUsers = allUsers.map(u => {
       if (u.phone === currentUser.phone) {
-        return {
-          ...u,
-          subscription: { name: packageName, months, expireDate: null, status: 'Pending' as const }
-        };
+        return { ...u, subscription: newSubscription };
       }
       return u;
     });
-    syncDB(users);
+    syncDB(newUsers);
   };
 
-  const addPromotion = (promo: Promotion) => {
-    const newPromos = [promo, ...promotions];
-    setPromotions(newPromos);
-    localStorage.setItem('sip_gym_promos_db', JSON.stringify(newPromos));
-    const users = allUsers.map(u => ({
-      ...u,
-      notifications: [{ id: Math.random().toString(), text: `Khuyến mãi mới: ${promo.title}`, date: Date.now(), read: false }, ...u.notifications]
-    }));
-    syncDB(users);
-  };
-
-  // Nếu là trang Admin, không dùng khung Mobile
-  if (isAdminPath) {
+  if (isLoading && dbService.isActive) {
     return (
-      <div className="w-full min-h-screen bg-[#F7F9FC]">
-        <Routes>
-          <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard allUsers={allUsers} setAllUsers={syncDB} promotions={promotions} onAddPromo={addPromotion} />} />
-        </Routes>
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
-  // Layout Mobile cho User
   return (
-    <div className="flex justify-center min-h-screen bg-gray-200">
-      <div className="relative w-full max-w-[430px] bg-[#F7FAFC] shadow-2xl min-h-screen flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
-          <Routes>
-            <Route 
-              path="/" 
-              element={
-                currentUser?.isLocked ? (
-                  <div className="p-10 text-center flex flex-col items-center justify-center min-h-[80vh]">
-                     <div className="bg-red-100 p-4 rounded-full mb-4"><span className="text-4xl">🔒</span></div>
-                     <h2 className="text-xl font-black text-gray-800 mb-2">TÀI KHOẢN BỊ KHÓA</h2>
-                     <p className="text-gray-500 font-medium">Tài khoản của bạn bị khóa vui lòng liên hệ admin để mở lại.</p>
-                     <button onClick={handleLogout} className="mt-6 text-blue-500 font-bold underline">Thoát</button>
-                  </div>
-                ) : (
-                  <Home 
-                    user={currentUser} 
-                    promotions={promotions}
-                    onOpenAuth={() => setIsAuthModalOpen(true)} 
-                    onLogout={handleLogout}
-                    onUpdateSubscription={updateSubscriptionRequest}
-                  />
-                )
-              } 
-            />
-            <Route path="/profile" element={<Profile user={currentUser} onUpdateSubscription={updateSubscriptionRequest} />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </div>
-        <BottomNav />
-        <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onLogin={handleLogin} />
+    <div className="min-h-screen bg-white flex flex-col overflow-hidden">
+      <PWAPrompt />
+      
+      <div className={`flex-1 overflow-y-auto no-scrollbar ${isAdminPath ? 'bg-[#0B0F1A]' : 'bg-[#F8FAFC]'}`}>
+        <Routes>
+          <Route 
+            path="/" 
+            element={
+              <Home 
+                user={currentUser} 
+                promotions={promotions}
+                trainers={trainers}
+                programs={programs}
+                onOpenAuth={() => setIsAuthModalOpen(true)} 
+                onLogout={handleLogout}
+                onUpdateUser={syncDB}
+                onUpdateSubscription={handleUpdateSubscription}
+                allUsers={allUsers}
+              />
+            } 
+          />
+          <Route path="/schedule" element={<TrainingSchedule user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} />} />
+          <Route path="/voucher" element={<Voucher vouchers={vouchers} />} />
+          <Route path="/support" element={<Support user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} />} />
+          <Route path="/profile" element={<Profile user={currentUser} onUpdateSubscription={handleUpdateSubscription} onUpdateUser={syncDB} allUsers={allUsers} />} />
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              <AdminDashboard 
+                allUsers={allUsers} 
+                setAllUsers={syncDB} 
+                promotions={promotions} 
+                setPromos={syncPromos}
+                vouchers={vouchers}
+                setVouchers={syncVouchers}
+                trainers={trainers} 
+                setTrainers={syncTrainers}
+                programs={programs} 
+                setPrograms={(p) => {}} 
+              />
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+        
+        {!isAdminPath && <div className="h-28"></div>}
       </div>
+      {!isAdminPath && <BottomNav />}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onLogin={handleLogin} />
     </div>
   );
 };

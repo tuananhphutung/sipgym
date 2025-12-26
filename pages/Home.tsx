@@ -1,27 +1,37 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ShieldCheck } from 'lucide-react';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
 import ActionCard from '../components/ActionCard';
 import QuickNav from '../components/QuickNav';
 import TutorialSection from '../components/TutorialSection';
-import { UserProfile, Promotion } from '../App';
+import { UserProfile, Promotion, Trainer, TrainingProgram } from '../App';
 
 interface HomeProps {
   user: UserProfile | null;
   promotions: Promotion[];
+  trainers: Trainer[];
+  programs: TrainingProgram[];
   onOpenAuth: () => void;
   onLogout: () => void;
-  onUpdateSubscription: (packageName: string, months: number) => void;
+  onUpdateSubscription: (packageName: string, months: number, price: number) => void;
+  onUpdateUser: (users: UserProfile[]) => void;
+  allUsers: UserProfile[];
 }
 
-const Home: React.FC<HomeProps> = ({ user, promotions, onOpenAuth, onLogout, onUpdateSubscription }) => {
+const Home: React.FC<HomeProps> = ({ 
+  user, promotions, trainers, programs, 
+  onOpenAuth, onLogout, onUpdateSubscription, onUpdateUser, allUsers 
+}) => {
+  const navigate = useNavigate();
+
   return (
-    <div className="animate-in fade-in duration-500">
-      <Header user={user} onLogout={onLogout} />
+    <div className="animate-in fade-in duration-500 relative">
+      <Header user={user} onLogout={onLogout} onUpdateUser={onUpdateUser} allUsers={allUsers} />
       <Hero />
       
-      {/* Promotion Banners from Admin */}
       {promotions.length > 0 && (
         <div className="px-5 mt-4 overflow-x-auto no-scrollbar flex gap-4 pb-2">
            {promotions.map(promo => (
@@ -42,8 +52,8 @@ const Home: React.FC<HomeProps> = ({ user, promotions, onOpenAuth, onLogout, onU
         subscription={user?.subscription || null}
         onUpdateSubscription={onUpdateSubscription}
       />
-      <QuickNav />
-      <TutorialSection />
+      <QuickNav trainers={trainers} />
+      <TutorialSection programs={programs} />
       <div className="h-10"></div>
     </div>
   );

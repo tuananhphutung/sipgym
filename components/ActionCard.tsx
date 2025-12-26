@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { DoorOpen, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { DoorOpen, CheckCircle, AlertCircle, Clock, Dumbbell } from 'lucide-react';
 import SubscriptionModal from './SubscriptionModal';
 import { Subscription } from '../App';
 
@@ -8,7 +8,7 @@ interface ActionCardProps {
   isLoggedIn: boolean;
   onOpenAuth: () => void;
   subscription: Subscription | null;
-  onUpdateSubscription: (packageName: string, months: number) => void;
+  onUpdateSubscription: (packageName: string, months: number, price: number) => void;
 }
 
 const ActionCard: React.FC<ActionCardProps> = ({ isLoggedIn, onOpenAuth, subscription, onUpdateSubscription }) => {
@@ -16,53 +16,68 @@ const ActionCard: React.FC<ActionCardProps> = ({ isLoggedIn, onOpenAuth, subscri
 
   return (
     <>
-      <div className="px-5 mt-6 relative z-20">
-        <div className="bg-white rounded-[32px] p-8 shadow-2xl shadow-blue-100 text-center border border-blue-50/50">
+      <div className="px-6 mt-4 relative z-20">
+        <div className="bg-white rounded-[45px] p-10 shadow-[0_20px_50px_rgba(0,174,239,0.08)] text-center border border-gray-50">
           {isLoggedIn ? (
             <>
               {!subscription && (
-                <div className="mb-4 flex items-center justify-center gap-2 text-orange-500 bg-orange-50 py-2 px-4 rounded-full animate-pulse border border-orange-100">
+                <div className="mb-4 flex items-center justify-center gap-2 text-orange-500 bg-orange-50 py-2 px-4 rounded-full border border-orange-100">
                   <AlertCircle className="w-4 h-4" />
-                  <span className="text-[11px] font-bold uppercase tracking-tight">Vui lòng đăng ký gói tập</span>
+                  <span className="text-[11px] font-bold uppercase">Vui lòng chọn gói tập</span>
                 </div>
               )}
 
               {subscription?.status === 'Pending' && (
-                <div className="mb-4 flex items-center justify-center gap-2 text-blue-500 bg-blue-50 py-2 px-4 rounded-full border border-blue-100">
+                <div className="mb-4 flex items-center justify-center gap-2 text-blue-500 bg-blue-50 py-2 px-4 rounded-full">
                   <Clock className="w-4 h-4 animate-spin" />
-                  <span className="text-[11px] font-bold uppercase tracking-tight">Đang chờ Admin duyệt gói...</span>
+                  <span className="text-[11px] font-bold uppercase">Đang chờ xác nhận...</span>
                 </div>
               )}
               
-              <div className="flex justify-center mb-4">
-                <div className={subscription?.status === 'Active' ? "bg-green-100 p-2 rounded-full" : "bg-gray-100 p-2 rounded-full"}>
-                  <CheckCircle className={`w-8 h-8 ${subscription?.status === 'Active' ? 'text-green-500' : 'text-gray-300'}`} />
-                </div>
-              </div>
-              
-              <h2 className="text-[#4A5568] text-xl font-black leading-tight">
-                {subscription?.status === 'Active' ? 'Sẵn sàng tập luyện!' : 'Bắt đầu hành trình'}<br />Hôm nay bạn tập gì?
+              <h2 className="text-[#333] text-2xl font-black leading-tight mb-2">
+                {subscription?.status === 'Active' 
+                  ? `Hội viên ${subscription.name}` 
+                  : 'Bắt đầu hành trình'}
               </h2>
+              <p className="text-sm text-gray-400 font-medium">Bạn đã sẵn sàng để bứt phá hôm nay chưa?</p>
               
               <button 
                 onClick={() => setIsSubModalOpen(true)}
-                className="mt-6 w-full bg-[#8DBF44] hover:bg-[#7ba83c] active:scale-[0.98] transition-all text-white py-3.5 rounded-2xl flex items-center justify-center gap-2 font-bold text-lg shadow-lg shadow-green-100"
+                disabled={subscription?.status === 'Pending'}
+                className={`mt-8 w-full transition-all text-white py-5 rounded-[25px] flex items-center justify-center gap-3 font-black text-xl shadow-xl uppercase tracking-tighter
+                  ${subscription?.status === 'Active' 
+                    ? 'bg-green-500 hover:bg-green-600 shadow-green-200' 
+                    : subscription?.status === 'Pending'
+                      ? 'bg-gray-300 cursor-not-allowed shadow-none'
+                      : 'bg-[#00AEEF] hover:bg-[#0096cc] active:scale-95 shadow-blue-200'
+                  }`}
               >
-                {subscription?.status === 'Pending' ? 'Đổi Gói Đăng Ký' : 'Bắt đầu ngay'}
+                {subscription?.status === 'Active' ? (
+                  <>
+                    <Dumbbell className="w-6 h-6" />
+                    {subscription.name} (Đã Duyệt)
+                  </>
+                ) : subscription?.status === 'Pending' ? (
+                  'Đang Chờ Duyệt...'
+                ) : (
+                  'Đăng Ký Ngay'
+                )}
               </button>
             </>
           ) : (
             <>
-              <h2 className="text-[#4A5568] text-xl font-bold leading-tight">
+              <h2 className="text-[#444] text-2xl font-black leading-tight tracking-tight">
                 Tham gia Sip Gym Nhà Bè<br />Ngay hôm nay!
               </h2>
-              <p className="mt-2 text-xs text-gray-400 font-medium">Chỉ cần số điện thoại, không cần đăng ký!</p>
+              <p className="mt-3 text-[13px] text-gray-400 font-bold opacity-80 uppercase tracking-tighter">
+                Chỉ cần số điện thoại, không cần đăng ký!
+              </p>
               
               <button 
                 onClick={onOpenAuth}
-                className="mt-6 w-full bg-[#00AEEF] hover:bg-[#0096cc] active:scale-[0.98] transition-all text-white py-3.5 rounded-2xl flex items-center justify-center gap-2 font-bold text-lg shadow-lg shadow-blue-200"
+                className="mt-8 w-full bg-[#00AEEF] hover:bg-[#0096cc] active:scale-95 transition-all text-white py-5 rounded-[25px] flex items-center justify-center gap-3 font-black text-xl shadow-xl shadow-blue-100 uppercase tracking-tighter"
               >
-                <DoorOpen className="w-5 h-5" />
+                <DoorOpen className="w-6 h-6" />
                 Đăng nhập / Tham gia
               </button>
             </>

@@ -5,7 +5,7 @@ import { X, CheckCircle2, MapPin, Navigation, Dumbbell, Flower2, Zap } from 'luc
 interface SubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUpdateSubscription: (packageName: string, months: number) => void;
+  onUpdateSubscription: (packageName: string, months: number, price: number) => void;
 }
 
 type Step = 'selection' | 'success' | 'branch_info';
@@ -13,27 +13,34 @@ type Step = 'selection' | 'success' | 'branch_info';
 const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose, onUpdateSubscription }) => {
   const [step, setStep] = useState<Step>('selection');
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<{label: string, months: number} | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<{label: string, months: number, discount: number} | null>(null);
 
   if (!isOpen) return null;
 
   const packages = [
-    { id: 'Gym', name: 'Gói Gym', icon: Dumbbell, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { id: 'Yoga', name: 'Gói Yoga', icon: Flower2, color: 'text-purple-500', bg: 'bg-purple-50' },
-    { id: 'Aerobic', name: 'Gói Aerobic', icon: Zap, color: 'text-orange-500', bg: 'bg-orange-50' },
+    { id: 'Gym', name: 'Gói Gym', icon: Dumbbell, color: 'text-blue-500', bg: 'bg-blue-50', basePrice: 500000 },
+    { id: 'Yoga', name: 'Gói Yoga', icon: Flower2, color: 'text-purple-500', bg: 'bg-purple-50', basePrice: 800000 },
+    { id: 'Aerobic', name: 'Gói Aerobic', icon: Zap, color: 'text-orange-500', bg: 'bg-orange-50', basePrice: 600000 },
   ];
 
   const durations = [
-    { label: '1 tháng', months: 1 },
-    { label: '3 tháng', months: 3 },
-    { label: '6 tháng', months: 6 },
-    { label: '1 năm', months: 12 }
+    { label: '1 tháng', months: 1, discount: 0 },
+    { label: '3 tháng', months: 3, discount: 0.1 }, // Giảm 10%
+    { label: '6 tháng', months: 6, discount: 0.15 }, // Giảm 15%
+    { label: '1 năm', months: 12, discount: 0.25 }   // Giảm 25%
   ];
 
   const handleConfirm = () => {
     if (selectedPackage && selectedDuration) {
-      onUpdateSubscription(selectedPackage, selectedDuration.months);
-      setStep('success');
+      const pkg = packages.find(p => p.id === selectedPackage);
+      if (pkg) {
+        // Tính tiền: Giá gốc * số tháng * (1 - chiết khấu)
+        const rawPrice = pkg.basePrice * selectedDuration.months;
+        const finalPrice = rawPrice * (1 - selectedDuration.discount);
+        
+        onUpdateSubscription(pkg.name, selectedDuration.months, Math.round(finalPrice));
+        setStep('success');
+      }
     }
   };
 
@@ -74,7 +81,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose, 
                     <div className={`w-12 h-12 ${pkg.bg} rounded-2xl flex items-center justify-center ${pkg.color}`}>
                       <pkg.icon className="w-6 h-6" />
                     </div>
-                    <span className="font-bold text-gray-700 text-lg">{pkg.name}</span>
+                    <div className="text-left">
+                       <div className="font-bold text-gray-700 text-lg">{pkg.name}</div>
+                       <div className="text-xs font-bold text-gray-400">{pkg.basePrice.toLocaleString()}đ / tháng</div>
+                    </div>
                     {selectedPackage === pkg.id && <CheckCircle2 className="ml-auto w-6 h-6 text-[#00AEEF]" />}
                   </button>
                 ))}
@@ -88,13 +98,14 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose, 
                       <button
                         key={duration.label}
                         onClick={() => setSelectedDuration(duration)}
-                        className={`py-3 rounded-2xl font-bold transition-all border-2 ${
+                        className={`py-3 rounded-2xl font-bold transition-all border-2 flex flex-col items-center justify-center ${
                           selectedDuration?.label === duration.label
                           ? 'bg-[#00AEEF] border-[#00AEEF] text-white shadow-lg shadow-blue-100'
                           : 'bg-white border-gray-100 text-gray-500'
                         }`}
                       >
-                        {duration.label}
+                        <span>{duration.label}</span>
+                        {duration.discount > 0 && <span className="text-[9px] opacity-80">Giảm {duration.discount * 100}%</span>}
                       </button>
                     ))}
                   </div>
