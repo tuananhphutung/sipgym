@@ -54,6 +54,14 @@
           }
         }
     </style>
+    
+    <!-- Force HTTPS for Official Domain -->
+    <script>
+        if (window.location.hostname === 'sipgymnhabe.phkglobal.com' && window.location.protocol !== 'https:') {
+            window.location.href = 'https://' + window.location.hostname + window.location.pathname + window.location.search;
+        }
+    </script>
+    
 <script type="importmap">
 {
   "imports": {
