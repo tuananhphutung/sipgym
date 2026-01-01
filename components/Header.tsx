@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { User, Bell, LogOut, X, Check } from 'lucide-react';
+import { User, Bell, LogOut, X, CalendarCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { UserProfile, Notification } from '../App';
+import { UserProfile } from '../App';
 
 interface HeaderProps {
   user: UserProfile | null;
@@ -15,16 +15,16 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
   const navigate = useNavigate();
   const [showNotiModal, setShowNotiModal] = useState(false);
 
-  // SAFE ACCESS: Thêm ? và || [] để tránh crash nếu user.notifications undefined
   const unreadNotifications = user?.notifications?.filter(n => !n.read) || [];
   const unreadCount = unreadNotifications.length;
 
-  // Tính số ngày còn lại
-  const daysLeft = useMemo(() => {
-    if (user?.subscription?.status === 'Active' && user.subscription.expireDate) {
+  const subscriptionInfo = useMemo(() => {
+    if (user?.subscription?.status === 'Active' && user.subscription.startDate && user.subscription.expireDate) {
+      const start = new Date(user.subscription.startDate).toLocaleDateString('vi-VN');
+      const end = new Date(user.subscription.expireDate).toLocaleDateString('vi-VN');
       const diff = user.subscription.expireDate - Date.now();
       const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-      return days > 0 ? days : 0;
+      return { start, end, days: days > 0 ? days : 0 };
     }
     return null;
   }, [user]);
@@ -45,7 +45,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
 
   return (
     <>
-      <div className="flex justify-between items-center px-6 pt-6 pb-2 relative z-10 bg-transparent">
+      <div className="flex justify-between items-start px-6 pt-6 pb-2 relative z-10 bg-transparent">
         <div className="flex items-center gap-4">
           <div 
             onClick={() => user && navigate('/profile')} 
@@ -61,11 +61,24 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
           </div>
 
           <div className="flex flex-col">
-              <span className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 ${daysLeft !== null ? 'text-[#00AEEF]' : 'text-gray-400'}`}>
-                {daysLeft !== null ? `Còn ${daysLeft} ngày tập` : 'Chào mừng,'}
-              </span>
-              <span className="text-base font-black text-gray-800 leading-none">
-                {user ? `Member ${user.phone.slice(-4)}` : 'Khách hàng'}
+              {subscriptionInfo ? (
+                 <div className="flex flex-col">
+                    <span className="text-[#FF6B00] text-[10px] font-black uppercase tracking-widest leading-none mb-1">
+                       Còn {subscriptionInfo.days} ngày
+                    </span>
+                    <div className="flex items-center gap-1 text-[9px] text-gray-400 font-bold bg-white/50 px-2 py-0.5 rounded-md border border-gray-100">
+                       <CalendarCheck className="w-3 h-3" />
+                       <span>{subscriptionInfo.start} - {subscriptionInfo.end}</span>
+                    </div>
+                 </div>
+              ) : (
+                 <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest leading-none mb-1">
+                   Chào mừng,
+                 </span>
+              )}
+              
+              <span className="text-base font-black text-gray-800 leading-tight mt-0.5">
+                {user ? (user.name || `Member ${user.phone.slice(-4)}`) : 'Khách hàng'}
               </span>
           </div>
         </div>
@@ -80,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
             onClick={() => user && setShowNotiModal(true)}
             className="relative w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 active:scale-90 transition-all cursor-pointer"
           >
-             <Bell className={`w-6 h-6 ${unreadCount > 0 ? 'text-[#00AEEF]' : 'text-gray-300'}`} />
+             <Bell className={`w-6 h-6 ${unreadCount > 0 ? 'text-[#FF6B00]' : 'text-gray-300'}`} />
              {unreadCount > 0 && (
                <div className="absolute top-2 right-2 min-w-[18px] h-[18px] bg-red-500 border-2 border-white rounded-full flex items-center justify-center">
                   <span className="text-[9px] text-white font-black">{unreadCount}</span>
@@ -103,7 +116,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-6">
               {(!user?.notifications || user.notifications.length === 0) ? (
                 <div className="text-center py-10 opacity-40">
-                   <Bell className="w-12 h-12 mx-auto mb-2" />
+                   <Bell className="w-12 h-12 mx-auto mb-2 text-orange-300" />
                    <p className="font-bold text-sm uppercase">Chưa có thông báo nào</p>
                 </div>
               ) : (
@@ -111,13 +124,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onUpdateUser, allUsers 
                   <div 
                     key={noti.id} 
                     onClick={() => !noti.read && markAsRead(noti.id)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${noti.read ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-blue-50 border-blue-100 shadow-sm'}`}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${noti.read ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-orange-50 border-orange-100 shadow-sm'}`}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <p className={`text-sm leading-tight ${noti.read ? 'font-medium text-gray-500' : 'font-black text-gray-800'}`}>
                         {noti.text}
                       </p>
-                      {!noti.read && <div className="w-2 h-2 bg-blue-500 rounded-full mt-1 shrink-0 ml-2"></div>}
+                      {!noti.read && <div className="w-2 h-2 bg-[#FF6B00] rounded-full mt-1 shrink-0 ml-2"></div>}
                     </div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase">
                       {new Date(noti.date).toLocaleString('vi-VN')}

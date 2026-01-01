@@ -20,19 +20,19 @@ const BottomNav: React.FC = () => {
           to={tab.path}
           className={({ isActive }) => `
             flex flex-col items-center gap-1.5 flex-1 transition-all duration-300 relative py-3
-            ${isActive ? 'text-[#00AEEF]' : 'text-[#A0AEC0]'}
+            ${isActive ? 'text-[#FF6B00]' : 'text-[#A0AEC0]'}
           `}
         >
           {({ isActive }) => (
             <>
               {isActive && (
-                <div className="absolute top-0 w-12 h-1 bg-[#00AEEF] rounded-full animate-in fade-in zoom-in duration-300"></div>
+                <div className="absolute top-0 w-12 h-1 bg-[#FF6B00] rounded-full animate-in fade-in zoom-in duration-300"></div>
               )}
               
               <tab.icon 
                 className={`w-7 h-7 transition-transform ${isActive ? 'stroke-[2.5px] scale-110' : 'stroke-[1.5px]'}`} 
               />
-              <span className={`text-[10px] font-black uppercase tracking-tighter ${isActive ? 'text-[#00AEEF]' : 'text-[#A0AEC0]'}`}>
+              <span className={`text-[10px] font-black uppercase tracking-tighter ${isActive ? 'text-[#FF6B00]' : 'text-[#A0AEC0]'}`}>
                 {tab.label}
               </span>
             </>

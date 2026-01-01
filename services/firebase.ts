@@ -39,7 +39,8 @@ const processSyncQueue = async () => {
         await set(ref(db, path), data);
         delete queue[path];
       } catch (err) {
-        console.error(`Vẫn chưa thể đồng bộ ${path}, sẽ thử lại sau.`);
+        // console.error(`Vẫn chưa thể đồng bộ ${path}, sẽ thử lại sau.`);
+        // Silent fail for permission denied to avoid console spam
       }
     }
 
@@ -63,14 +64,19 @@ try {
 
   // --- KÍCH HOẠT DATABASE ---
   // Ghi ngay một dòng dữ liệu test để Admin thấy trên màn hình Firebase
-  set(ref(db, 'connection_status'), {
+  // Note: Wrapped in a way to not throw loud errors if rules deny it
+  const testRef = ref(db, 'connection_status');
+  set(testRef, {
     status: 'ONLINE',
     message: 'App Sip Gym đã kết nối thành công!',
     last_login: new Date().toLocaleString('vi-VN')
-  }).then(() => {
-    console.log("✅ Đã ghi test connection lên Firebase");
   }).catch((err) => {
-    console.error("❌ Lỗi ghi test connection (Kiểm tra lại Rules):", err);
+    // Suppress Permission Denied error
+    if (err.code !== 'PERMISSION_DENIED') {
+        console.warn("Firebase Write Warning:", err.message);
+    } else {
+        console.log("ℹ️ Firebase Read-only mode (Permission Denied for writes)");
+    }
   });
   // ---------------------------
 
@@ -111,7 +117,8 @@ export const dbService = {
            }
         })
         .catch((err) => {
-          console.warn("Mất mạng khi lưu! Đang thêm vào hàng đợi...", err);
+          // console.warn("Mất mạng khi lưu! Đang thêm vào hàng đợi...", err);
+          // If permission denied or network error, queue it
           dbService.addToQueue(path, data);
         });
     } else {
@@ -155,7 +162,10 @@ export const dbService = {
           callback(cloudData);
         }
       }, (error) => {
-        console.warn("Đang dùng dữ liệu Offline do lỗi mạng:", error);
+        // Suppress read errors
+        if ((error as any).code !== 'PERMISSION_DENIED') {
+            console.warn("Firebase Read Warning:", error.message);
+        }
       });
     }
   },

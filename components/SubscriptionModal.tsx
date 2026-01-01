@@ -1,27 +1,27 @@
 
 import React, { useState } from 'react';
-import { X, CheckCircle2, MapPin, Navigation, Dumbbell, Flower2, Zap } from 'lucide-react';
+import { X, CheckCircle2, MapPin, Navigation, Dumbbell } from 'lucide-react';
+import { PackageItem } from '../App';
 
 interface SubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdateSubscription: (packageName: string, months: number, price: number) => void;
+  packages: PackageItem[];
+  referralDiscount?: number; // 0.1 (10%) or 0.05 (5%)
+  discountReason?: string; // "Ưu đãi giới thiệu"
 }
 
 type Step = 'selection' | 'success' | 'branch_info';
 
-const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose, onUpdateSubscription }) => {
+const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ 
+  isOpen, onClose, onUpdateSubscription, packages, referralDiscount = 0, discountReason 
+}) => {
   const [step, setStep] = useState<Step>('selection');
-  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<{label: string, months: number, discount: number} | null>(null);
 
   if (!isOpen) return null;
-
-  const packages = [
-    { id: 'Gym', name: 'Gói Gym', icon: Dumbbell, color: 'text-blue-500', bg: 'bg-blue-50', basePrice: 500000 },
-    { id: 'Yoga', name: 'Gói Yoga', icon: Flower2, color: 'text-purple-500', bg: 'bg-purple-50', basePrice: 800000 },
-    { id: 'Aerobic', name: 'Gói Aerobic', icon: Zap, color: 'text-orange-500', bg: 'bg-orange-50', basePrice: 600000 },
-  ];
 
   const durations = [
     { label: '1 tháng', months: 1, discount: 0 },
@@ -32,15 +32,13 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose, 
 
   const handleConfirm = () => {
     if (selectedPackage && selectedDuration) {
-      const pkg = packages.find(p => p.id === selectedPackage);
-      if (pkg) {
-        // Tính tiền: Giá gốc * số tháng * (1 - chiết khấu)
-        const rawPrice = pkg.basePrice * selectedDuration.months;
-        const finalPrice = rawPrice * (1 - selectedDuration.discount);
+        // Tính tiền: Giá gốc * số tháng * (1 - chiết khấu thời hạn) * (1 - chiết khấu giới thiệu)
+        const basePriceTotal = selectedPackage.price * selectedDuration.months;
+        const durationDiscounted = basePriceTotal * (1 - selectedDuration.discount);
+        const finalPrice = durationDiscounted * (1 - referralDiscount);
         
-        onUpdateSubscription(pkg.name, selectedDuration.months, Math.round(finalPrice));
+        onUpdateSubscription(selectedPackage.name, selectedDuration.months, Math.round(finalPrice));
         setStep('success');
-      }
     }
   };
 
@@ -67,25 +65,33 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose, 
         <div className="overflow-y-auto no-scrollbar p-6">
           {step === 'selection' && (
             <div className="space-y-6">
+              {/* Promotion Banner if Referral Exists */}
+              {referralDiscount > 0 && (
+                 <div className="bg-gradient-to-r from-pink-500 to-red-500 rounded-2xl p-4 text-white shadow-lg">
+                    <p className="font-black text-sm uppercase mb-1">🎉 {discountReason || "Ưu đãi đặc biệt"}</p>
+                    <p className="text-xs font-bold opacity-90">Bạn được giảm thêm {(referralDiscount * 100)}% cho lần đăng ký này!</p>
+                 </div>
+              )}
+
               <div className="grid grid-cols-1 gap-3">
                 {packages.map((pkg) => (
                   <button
                     key={pkg.id}
-                    onClick={() => setSelectedPackage(pkg.id)}
-                    className={`flex items-center gap-4 p-4 rounded-3xl border-2 transition-all ${
-                      selectedPackage === pkg.id 
+                    onClick={() => setSelectedPackage(pkg)}
+                    className={`relative overflow-hidden flex items-center gap-4 p-3 rounded-3xl border-2 transition-all group ${
+                      selectedPackage?.id === pkg.id 
                       ? 'border-[#00AEEF] bg-blue-50/50' 
                       : 'border-gray-100 bg-white'
                     }`}
                   >
-                    <div className={`w-12 h-12 ${pkg.bg} rounded-2xl flex items-center justify-center ${pkg.color}`}>
-                      <pkg.icon className="w-6 h-6" />
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 shadow-sm">
+                      <img src={pkg.image} alt={pkg.name} className="w-full h-full object-cover" />
                     </div>
-                    <div className="text-left">
+                    <div className="text-left flex-1 relative z-10">
                        <div className="font-bold text-gray-700 text-lg">{pkg.name}</div>
-                       <div className="text-xs font-bold text-gray-400">{pkg.basePrice.toLocaleString()}đ / tháng</div>
+                       <div className="text-xs font-bold text-gray-400">{pkg.price.toLocaleString()}đ / tháng</div>
                     </div>
-                    {selectedPackage === pkg.id && <CheckCircle2 className="ml-auto w-6 h-6 text-[#00AEEF]" />}
+                    {selectedPackage?.id === pkg.id && <CheckCircle2 className="ml-auto w-6 h-6 text-[#00AEEF]" />}
                   </button>
                 ))}
               </div>
@@ -110,6 +116,34 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose, 
                     ))}
                   </div>
                 </div>
+              )}
+
+              {/* Price Calculation Preview */}
+              {selectedPackage && selectedDuration && (
+                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
+                       <span>Đơn giá:</span>
+                       <span>{(selectedPackage.price * selectedDuration.months).toLocaleString()}đ</span>
+                    </div>
+                    {selectedDuration.discount > 0 && (
+                        <div className="flex justify-between text-xs font-bold text-green-500 mb-1">
+                           <span>Giảm theo thời hạn ({(selectedDuration.discount*100)}%):</span>
+                           <span>-{(selectedPackage.price * selectedDuration.months * selectedDuration.discount).toLocaleString()}đ</span>
+                        </div>
+                    )}
+                    {referralDiscount > 0 && (
+                        <div className="flex justify-between text-xs font-bold text-pink-500 mb-1">
+                           <span>Giảm giá giới thiệu ({(referralDiscount*100)}%):</span>
+                           <span>-{(selectedPackage.price * selectedDuration.months * (1 - selectedDuration.discount) * referralDiscount).toLocaleString()}đ</span>
+                        </div>
+                    )}
+                    <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between text-lg font-black text-gray-800">
+                       <span>Thành tiền:</span>
+                       <span className="text-[#00AEEF]">
+                         {Math.round(selectedPackage.price * selectedDuration.months * (1 - selectedDuration.discount) * (1 - referralDiscount)).toLocaleString()}đ
+                       </span>
+                    </div>
+                 </div>
               )}
 
               <button

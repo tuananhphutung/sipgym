@@ -1,22 +1,65 @@
 
 import React, { useState } from 'react';
-import { CalendarCheck, Accessibility, Calendar, X, Star as StarIcon } from 'lucide-react';
+import { CalendarCheck, Accessibility, Calendar, X, Star as StarIcon, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Trainer } from '../App';
+import { Trainer, UserProfile, Booking } from '../App';
+import BookingModal from './BookingModal';
 
 interface QuickNavProps {
   trainers: Trainer[];
+  user?: UserProfile | null;
+  bookings?: Booking[];
+  onUpdateBookings?: (bookings: Booking[]) => void;
+  onOpenAuth?: () => void;
 }
 
-const QuickNav: React.FC<QuickNavProps> = ({ trainers }) => {
+const QuickNav: React.FC<QuickNavProps> = ({ trainers, user, bookings = [], onUpdateBookings, onOpenAuth }) => {
   const navigate = useNavigate();
   const [showTrainerModal, setShowTrainerModal] = useState(false);
+  const [selectedTrainerForBooking, setSelectedTrainerForBooking] = useState<Trainer | null>(null);
 
   const items = [
     { label: 'Check lịch tập', icon: CalendarCheck, color: 'text-white', bg: 'bg-[#00AEEF]', action: () => navigate('/schedule') },
     { label: 'Huấn Luyện Viên', icon: Accessibility, color: 'text-[#00AEEF]', bg: 'bg-white', action: () => setShowTrainerModal(true) },
     { label: 'Lớp học', icon: Calendar, color: 'text-white', bg: 'bg-[#00AEEF]', action: () => {} }
   ];
+
+  const handleBook = (trainer: Trainer) => {
+      if (!user) {
+          if(onOpenAuth) onOpenAuth();
+          return;
+      }
+      if (!user.ptSubscription || user.ptSubscription.status !== 'Active') {
+          alert("Bạn cần đăng ký gói PT hoặc PT ngày để đặt lịch!");
+          return;
+      }
+      setSelectedTrainerForBooking(trainer);
+  };
+
+  const confirmBooking = (date: string, timeSlot: string) => {
+      if (!user || !selectedTrainerForBooking || !onUpdateBookings) return;
+
+      // Check remaining sessions logic if needed, but per request just create booking
+      const newBooking: Booking = {
+          id: Date.now().toString(),
+          userId: user.phone,
+          userName: user.realName || user.name || "User",
+          userAvatar: user.avatar || "",
+          trainerId: selectedTrainerForBooking.id,
+          trainerName: selectedTrainerForBooking.name,
+          date: date,
+          timeSlot: timeSlot,
+          status: 'Pending',
+          timestamp: Date.now()
+      };
+
+      // Check conflict to set initial color/status (though backend logic should be 'Pending' by default for safety)
+      const isConflict = bookings.some(b => b.date === date && b.timeSlot === timeSlot && b.trainerId === selectedTrainerForBooking.id && b.status === 'Approved');
+      
+      onUpdateBookings([...bookings, newBooking]);
+      setSelectedTrainerForBooking(null);
+      alert(isConflict ? "Khung giờ này đã có người. Bạn đã vào danh sách chờ duyệt!" : "Đã gửi yêu cầu đặt lịch! Vui lòng chờ PT xác nhận.");
+  };
 
   return (
     <>
@@ -70,13 +113,30 @@ const QuickNav: React.FC<QuickNavProps> = ({ trainers }) => {
                         <span className="text-[10px] font-black text-gray-400 ml-1">{trainer.rating}.0</span>
                       </div>
                     </div>
-                    <button className="bg-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm border border-gray-100 text-[#00AEEF] active:scale-95 transition-transform">Đặt Lịch</button>
+                    <button 
+                      onClick={() => handleBook(trainer)}
+                      className="bg-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm border border-gray-100 text-[#00AEEF] active:scale-95 transition-transform flex flex-col items-center"
+                    >
+                       <Clock className="w-4 h-4 mb-1" />
+                       Đặt Lịch
+                    </button>
                   </div>
                 ))
               )}
             </div>
           </div>
         </div>
+      )}
+
+      {selectedTrainerForBooking && user && (
+          <BookingModal 
+             isOpen={!!selectedTrainerForBooking}
+             onClose={() => setSelectedTrainerForBooking(null)}
+             trainer={selectedTrainerForBooking}
+             user={user}
+             bookings={bookings}
+             onConfirm={confirmBooking}
+          />
       )}
     </>
   );

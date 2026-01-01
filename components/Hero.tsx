@@ -1,60 +1,52 @@
 
 import React from 'react';
-import { UserPlus } from 'lucide-react';
 
-const Hero: React.FC = () => {
+interface HeroProps {
+  image?: string;
+}
+
+const Hero: React.FC<HeroProps> = ({ image }) => {
+  const bgImage = image || "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600";
+
   return (
-    <div className="relative pt-2 pb-6 overflow-hidden">
-      <div className="px-6 relative z-10 flex flex-col">
-        {/* Logo in top left of hero */}
-        <div className="mb-4">
-            <img 
-              src="https://phukienlimousine.vn/wp-content/uploads/2025/12/LOGO_SIP_GYM_pages-to-jpg-0001-removebg-preview.png" 
-              alt="Sip Gym Nhà Bè" 
-              className="h-14 object-contain"
-            />
+    <div className="relative pt-2 pb-6">
+      {/* App Title / Header Area - Moved slightly to overlap/integrate with Hero */}
+      <div className="px-6 flex flex-col items-center sm:items-start mb-4">
+        {/* Logo */}
+        <div className="mb-2 w-full flex justify-center sm:justify-start">
+            <div className="relative w-32 h-32 bg-white rounded-full shadow-lg flex items-center justify-center p-2 border-4 border-[#FF6B00]/20 animate-in zoom-in duration-700">
+               <img 
+                src="https://phukienlimousine.vn/wp-content/uploads/2025/12/LOGO_SIP_GYM_pages-to-jpg-0001-removebg-preview.png" 
+                alt="Sip Gym Nhà Bè" 
+                className="w-full h-full object-contain drop-shadow-md"
+              />
+            </div>
         </div>
 
-        {/* Hero Text Styling */}
-        <div className="relative">
-          <h1 className="text-[#00A5E0] font-[900] text-5xl leading-[0.9] tracking-tighter uppercase italic">
+        {/* Text */}
+        <div className="relative w-full text-center sm:text-left">
+          <h1 className="text-[#FF6B00] font-[900] text-4xl leading-[0.9] tracking-tighter uppercase italic drop-shadow-sm">
             CÂU LẠC<br />BỘ<br />GYM
           </h1>
-          <div className="inline-block mt-4 bg-[#8DBF44] text-white text-[11px] px-4 py-1.5 rounded-full font-black uppercase tracking-wider">
+          <div className="inline-block mt-2 bg-[#2ECC71] text-white text-[10px] px-4 py-1.5 rounded-full font-black uppercase tracking-wider shadow-md">
             GYM CHO MỌI NGƯỜI
           </div>
         </div>
       </div>
 
-      {/* Decorative Hero Image with Mask */}
-      <div className="absolute top-[20px] right-[-20px] w-[260px] h-[350px] z-0 pwa-hide">
-        <div className="relative w-full h-full">
-           {/* The large circular image container */}
-           <div className="absolute inset-0 rounded-bl-[140px] overflow-hidden">
-              <img 
-                src="https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600" 
-                alt="Gym Training" 
-                className="w-full h-full object-cover grayscale-[0.2]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-l from-white/10 to-transparent"></div>
-           </div>
-           
-           {/* Trainer circular highlight */}
-           <div className="absolute top-[30%] left-[-20%] w-40 h-40 bg-white p-1 rounded-full shadow-2xl z-20">
-              <img 
-                src="https://images.unsplash.com/photo-1571731956672-f2b94d7dd0cb?auto=format&fit=crop&q=80&w=400" 
-                className="w-full h-full object-cover rounded-full"
-                alt="trainer"
-              />
-           </div>
-        </div>
-      </div>
-
-      <div className="flex justify-center mt-12 relative z-10">
-        <button className="flex items-center gap-2 bg-[#E9F3F8] text-[#00AEEF] font-bold px-8 py-3 rounded-full shadow-sm text-sm border border-white/50">
-          <UserPlus className="w-4 h-4" />
-          Giới thiệu bạn
-        </button>
+      {/* Full Square Hero Image Optimized for App */}
+      <div className="w-full aspect-square relative rounded-b-[40px] overflow-hidden shadow-2xl shadow-orange-100/50 mt-2">
+         <img 
+            src={bgImage} 
+            alt="Hero Banner" 
+            className="w-full h-full object-cover"
+         />
+         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+         
+         <div className="absolute bottom-6 left-6 text-white">
+            <p className="font-black text-xl uppercase italic drop-shadow-lg">Thay đổi bản thân</p>
+            <p className="text-xs font-medium opacity-90">Tại Sip Gym Nhà Bè</p>
+         </div>
       </div>
     </div>
   );

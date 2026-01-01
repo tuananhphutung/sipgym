@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Profile from './pages/Profile';
 import TrainingSchedule from './pages/TrainingSchedule';
@@ -10,8 +10,26 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import BottomNav from './components/BottomNav';
 import AuthModal from './components/AuthModal';
+import SetupPasswordModal from './components/SetupPasswordModal';
 import PWAPrompt from './components/PWAPrompt';
+import GlobalNotification from './components/GlobalNotification'; // New Component
 import { dbService } from './services/firebase';
+
+export interface PackageItem {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  description?: string;
+}
+
+export interface PTPackage {
+  id: string;
+  name: string;
+  price: number;
+  sessions: number; // Số buổi tập
+  image: string;
+}
 
 export interface Subscription {
   name: string;
@@ -19,7 +37,39 @@ export interface Subscription {
   expireDate: number | null;
   startDate: number;
   price: number;
-  status: 'Pending' | 'Active' | 'Expired' | 'Rejected';
+  paidAmount: number; // Số tiền thực trả
+  paymentMethod?: string;
+  voucherCode?: string;
+  status: 'Pending' | 'Active' | 'Expired' | 'Rejected' | 'Pending Preservation' | 'Preserved';
+  packageImage?: string;
+}
+
+export interface PTSubscription {
+  packageId: string;
+  name: string;
+  price: number;
+  paidAmount: number; // Số tiền thực trả
+  totalSessions: number;
+  sessionsRemaining: number;
+  image: string;
+  status: 'Pending' | 'Active' | 'Finished';
+  startDate?: number;
+}
+
+export interface Booking {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  trainerId: string;
+  trainerName: string;
+  date: string; // YYYY-MM-DD
+  timeSlot: string; // "09:00 - 10:00"
+  status: 'Pending' | 'Approved' | 'Completed' | 'Rejected';
+  rating?: number;
+  comment?: string;
+  media?: string[]; // URLs images/videos
+  timestamp: number;
 }
 
 export interface Notification {
@@ -27,6 +77,7 @@ export interface Notification {
   text: string;
   date: number;
   read: boolean;
+  type?: 'system' | 'admin_msg' | 'approval' | 'booking';
 }
 
 export interface ChatMessage {
@@ -37,14 +88,50 @@ export interface ChatMessage {
 
 export interface UserProfile {
   phone: string;
-  name?: string; 
+  password?: string;
+  faceData?: string | null;
+  loginMethod?: 'password' | 'face';
+  gender?: 'Nam' | 'Nữ' | 'Khác'; 
+  
+  realName?: string; // Tên thật (Chỉ Admin sửa)
+  name?: string; // Biệt danh (User hiển thị)
+  
   avatar: string | null;
   subscription: Subscription | null;
+  ptSubscription?: PTSubscription | null;
   isLocked: boolean;
   notifications: Notification[];
   messages: ChatMessage[]; 
-  trainingDays: string[]; 
+  trainingDays: string[];
+  
+  referredBy?: string;
+  referralBonusAvailable?: boolean;
+  hasUsedReferralDiscount?: boolean;
+  
+  settings?: {
+    popupNotification: boolean;
+  };
 }
+
+// --- ADMIN INTERFACES ---
+export type AdminPermission = 
+  | 'view_users' | 'approve_users' | 'view_revenue' | 'view_revenue_details'
+  | 'send_notification' | 'edit_user_settings' | 'manage_user' | 'chat_user'
+  | 'manage_packages' | 'manage_pt_packages' | 'add_pt' | 'view_user_list'
+  | 'manage_promo' | 'manage_voucher' | 'view_schedule' | 'manage_app_interface' | 'manage_bookings';
+
+export interface AdminProfile {
+  username: string;
+  password?: string; // In real app, hash this
+  role: 'super_admin' | 'sub_admin';
+  name: string;
+  permissions: AdminPermission[];
+  settings: {
+    showFloatingMenu: boolean;
+    showPopupNoti: boolean;
+  };
+}
+// ------------------------
 
 export interface Promotion {
   id: string;
@@ -57,8 +144,10 @@ export interface VoucherItem {
   id: string;
   title: string;
   code: string;
-  type: string;
+  type: 'Gym' | 'PT' | 'Gift';
+  value: number; // 0.1 = 10%
   color: string;
+  image?: string; // Added image for voucher
 }
 
 export interface Trainer {
@@ -79,155 +168,319 @@ export interface TrainingProgram {
 const AppContent: React.FC = () => {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  
+  // Admin State
+  const [currentAdmin, setCurrentAdmin] = useState<AdminProfile | null>(null);
+  const [admins, setAdmins] = useState<AdminProfile[]>([]);
+
+  // App Settings State
+  const [heroImage, setHeroImage] = useState<string>('https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600');
+
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [vouchers, setVouchers] = useState<VoucherItem[]>([
-    { id: '1', title: 'Giảm 20% Gói Gym 3 tháng', code: 'SIPGYM20', type: 'Gym', color: 'bg-blue-500' },
-    { id: '2', title: 'Tặng 1 buổi PT miễn phí', code: 'FREEPT', type: 'Gift', color: 'bg-green-500' }
+    { id: '1', title: 'Giảm 20% Gói Gym', code: 'SIPGYM20', type: 'Gym', value: 0.2, color: 'bg-orange-500' },
+    { id: '2', title: 'Giảm 10% Gói PT', code: 'PT10', type: 'PT', value: 0.1, color: 'bg-blue-500' }
   ]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   
+  const [packages, setPackages] = useState<PackageItem[]>([
+    { id: 'gym', name: 'Gói Gym', price: 500000, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300' },
+    { id: 'groupx', name: 'Gói Group X', price: 800000, image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=300' },
+  ]);
+
+  const [ptPackages, setPTPackages] = useState<PTPackage[]>([
+     { id: 'pt1', name: 'PT 1 Kèm 1 (12 Buổi)', price: 3600000, sessions: 12, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&q=80&w=300' },
+     { id: 'pt2', name: 'PT 1 Kèm 1 (24 Buổi)', price: 6500000, sessions: 24, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300' }
+  ]);
+
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Loading state for async DB
+  const [isSetupPassOpen, setIsSetupPassOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); 
+  
+  // Global Popup Notification State
+  const [popupNotification, setPopupNotification] = useState<{title: string, msg: string} | null>(null);
+
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isAdminPath = location.pathname.startsWith('/admin');
 
-  // Load & Subscribe Data
+  // Initialize Default Super Admin
   useEffect(() => {
-    // FIX LOADING STUCK: Tự động tắt loading sau 1.5s bất kể Firebase có kết nối được hay không
+    const savedAdminsStr = localStorage.getItem('sip_gym_admins_db');
+    let adminList: AdminProfile[] = [];
+
+    if (savedAdminsStr) {
+      try {
+        adminList = JSON.parse(savedAdminsStr);
+      } catch (e) {
+        adminList = [];
+      }
+    }
+
+    // Ensure super admin 'admin' exists
+    const adminIndex = adminList.findIndex(a => a.username === 'admin');
+    
+    if (adminIndex === -1) {
+        adminList.push({
+            username: 'admin',
+            password: '123456', 
+            role: 'super_admin',
+            name: 'Super Admin',
+            permissions: [], 
+            settings: { showFloatingMenu: true, showPopupNoti: true }
+        });
+        localStorage.setItem('sip_gym_admins_db', JSON.stringify(adminList));
+    } else {
+        if (adminList[adminIndex].password !== '123456') {
+            adminList[adminIndex].password = '123456';
+            localStorage.setItem('sip_gym_admins_db', JSON.stringify(adminList));
+        }
+    }
+    setAdmins(adminList);
+  }, []);
+
+  const syncAdmins = (newAdmins: AdminProfile[]) => {
+    setAdmins(newAdmins);
+    localStorage.setItem('sip_gym_admins_db', JSON.stringify(newAdmins));
+    if (currentAdmin) {
+      const updatedMe = newAdmins.find(a => a.username === currentAdmin.username);
+      if (updatedMe) setCurrentAdmin(updatedMe);
+    }
+  };
+
+  useEffect(() => {
     const timer = setTimeout(() => {
         setIsLoading(false);
     }, 1500);
 
-    // 1. Users
+    // 1. Users & Notifications Logic
     dbService.subscribe('users', (data: any) => {
-      // CRITICAL FIX: Convert Firebase Object/Map to Array & Ensure sub-arrays exist
       const rawList = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
       const sanitizedUsers: UserProfile[] = rawList.map((u: any) => ({
         ...u,
         notifications: Array.isArray(u.notifications) ? u.notifications : (u.notifications ? Object.values(u.notifications) : []),
         messages: Array.isArray(u.messages) ? u.messages : (u.messages ? Object.values(u.messages) : []),
-        trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : [])
+        trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : []),
+        settings: u.settings || { popupNotification: true } // Default ON
       }));
 
-      setAllUsers(sanitizedUsers);
-      
-      // Update current user realtime
+      // Detect changes for Current User to show Popup
       const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
       if (loggedPhone) {
-        const user = sanitizedUsers.find(u => u.phone === loggedPhone);
-        if (user) setCurrentUser(user);
+        const newUserState = sanitizedUsers.find(u => u.phone === loggedPhone);
+        const oldUserState = allUsers.find(u => u.phone === loggedPhone);
+        
+        if (newUserState && oldUserState) {
+             // Check new notifications
+             if (newUserState.notifications.length > oldUserState.notifications.length) {
+                 const newNoti = newUserState.notifications[0];
+                 if (newUserState.settings?.popupNotification && !newNoti.read) {
+                     setPopupNotification({ title: 'Thông báo mới', msg: newNoti.text });
+                 }
+             }
+             // Check new messages
+             if (newUserState.messages.length > oldUserState.messages.length) {
+                 const lastMsg = newUserState.messages[newUserState.messages.length - 1];
+                 if (lastMsg.sender === 'admin' && newUserState.settings?.popupNotification) {
+                     setPopupNotification({ title: 'Tin nhắn từ Admin', msg: lastMsg.text });
+                 }
+             }
+        }
+
+        if (newUserState) {
+          setCurrentUser(newUserState);
+          if (!newUserState.password) {
+            setIsSetupPassOpen(true);
+          }
+        }
       }
+
+      setAllUsers(sanitizedUsers);
       setIsLoading(false);
     });
 
-    // 2. Promotions
+    // Subscribe Bookings
+    dbService.subscribe('bookings', (data: any) => {
+       let rawBookings = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+       
+       // ADD SAMPLE RATINGS IF EMPTY FOR DEMO
+       if (rawBookings.length === 0) {
+           rawBookings = [
+               {
+                   id: 'sample1', userId: '0901234567', userName: 'Nguyễn Văn A', userAvatar: '', trainerId: 't1', trainerName: 'HLV Tuấn Anh',
+                   date: '2023-12-01', timeSlot: '09:00 - 10:00', status: 'Completed', rating: 5, comment: 'Tập rất nhiệt tình, đúng kỹ thuật! Phòng tập sạch sẽ.', timestamp: Date.now() - 100000
+               },
+               {
+                   id: 'sample2', userId: '0909876543', userName: 'Trần Thị B', userAvatar: '', trainerId: 't2', trainerName: 'HLV Minh Thư',
+                   date: '2023-12-02', timeSlot: '17:00 - 18:00', status: 'Completed', rating: 4, comment: 'Bài tập cardio hôm nay hơi nặng nhưng rất đã.', timestamp: Date.now() - 50000
+               },
+               {
+                   id: 'sample3', userId: '0912345678', userName: 'Lê C', userAvatar: '', trainerId: 't1', trainerName: 'HLV Tuấn Anh',
+                   date: '2023-12-03', timeSlot: '18:00 - 19:00', status: 'Pending', rating: 0, comment: '', timestamp: Date.now()
+               }
+           ];
+           dbService.saveAll('bookings', rawBookings);
+       }
+
+       setBookings(rawBookings as Booking[]);
+    });
+
+    // Subscribe to App Settings (Hero Image)
+    dbService.subscribe('app_settings', (data: any) => {
+        if (data && data.heroImage) {
+            setHeroImage(data.heroImage);
+        }
+    });
+
+    // Subscriptions for other data...
     dbService.subscribe('promos', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
       if (list.length > 0) setPromotions(list as Promotion[]);
     });
 
-    // 3. Vouchers
     dbService.subscribe('vouchers', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
       if (list.length > 0) setVouchers(list as VoucherItem[]);
     });
 
-    // 4. Trainers
     dbService.subscribe('trainers', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
       if (list.length > 0) setTrainers(list as Trainer[]);
     });
 
-    // 5. Programs
-    dbService.subscribe('programs', (data: any) => {
+    dbService.subscribe('packages', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-      if (list.length > 0) setPrograms(list as TrainingProgram[]);
+      if (list.length > 0) setPackages(list as PackageItem[]);
     });
 
-    return () => clearTimeout(timer);
-  }, []);
+    dbService.subscribe('pt_packages', (data: any) => {
+      const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+      if (list.length > 0) setPTPackages(list as PTPackage[]);
+    });
 
-  // Write Functions
+    // Check for logged in admin session
+    const adminSession = localStorage.getItem('admin_session');
+    if (adminSession) {
+       const savedAdmin = JSON.parse(adminSession);
+       setCurrentAdmin(savedAdmin);
+    }
+
+    return () => clearTimeout(timer);
+  }, [allUsers.length]); 
+
   const syncDB = (newUsers: UserProfile[]) => {
-    setAllUsers(newUsers); // Optimistic UI update
+    setAllUsers(newUsers); 
+    const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
+    if(loggedPhone) {
+        const me = newUsers.find(u => u.phone === loggedPhone);
+        if(me) setCurrentUser(me);
+    }
     dbService.saveAll('users', newUsers);
   };
 
-  const syncVouchers = (newVouchers: VoucherItem[]) => {
-    setVouchers(newVouchers);
-    dbService.saveAll('vouchers', newVouchers);
-  };
-
-  const syncPromos = (newPromos: Promotion[]) => {
-    setPromotions(newPromos);
-    dbService.saveAll('promos', newPromos);
+  const syncBookings = (newBookings: Booking[]) => {
+      setBookings(newBookings);
+      dbService.saveAll('bookings', newBookings);
   };
   
-  const syncTrainers = (newTrainers: Trainer[]) => {
-    setTrainers(newTrainers);
-    dbService.saveAll('trainers', newTrainers);
+  const syncHeroImage = (url: string) => {
+      setHeroImage(url);
+      dbService.saveAll('app_settings', { heroImage: url });
+  };
+  
+  const syncVouchers = (newVouchers: VoucherItem[]) => { setVouchers(newVouchers); dbService.saveAll('vouchers', newVouchers); };
+  const syncPromos = (newPromos: Promotion[]) => { setPromotions(newPromos); dbService.saveAll('promos', newPromos); };
+  const syncTrainers = (newTrainers: Trainer[]) => { setTrainers(newTrainers); dbService.saveAll('trainers', newTrainers); };
+  const syncPackages = (newPackages: PackageItem[]) => { setPackages(newPackages); dbService.saveAll('packages', newPackages); };
+  const syncPTPackages = (newPTPackages: PTPackage[]) => { setPTPackages(newPTPackages); dbService.saveAll('pt_packages', newPTPackages); };
+
+  const handleLoginSuccess = (user: UserProfile) => {
+    localStorage.setItem('sip_gym_logged_phone', user.phone);
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+    if (!user.password) {
+       setIsSetupPassOpen(true);
+    }
   };
 
-  const handleLogin = (phone: string) => {
-    let users = [...allUsers];
-    let user = users.find(u => u.phone === phone);
-    if (!user) {
-      user = { 
-        phone, 
-        name: `Member ${phone.slice(-4)}`,
-        avatar: null, 
-        subscription: null, 
-        isLocked: false, 
-        notifications: [], 
-        messages: [],
-        trainingDays: [] 
-      };
-      users.push(user);
-    }
+  const handleRegister = (phone: string, gender: 'Nam' | 'Nữ' | 'Khác') => {
+    const newUser: UserProfile = { 
+      phone, 
+      gender,
+      realName: `Hội viên mới`, 
+      name: `Member ${phone.slice(-4)}`,
+      avatar: null, 
+      subscription: null,
+      ptSubscription: null,
+      isLocked: false, 
+      notifications: [], 
+      messages: [],
+      trainingDays: [],
+      loginMethod: 'password',
+      settings: { popupNotification: true }
+    };
     
-    if (user.isLocked) {
-      alert("Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ Admin.");
-      return;
-    }
-
-    localStorage.setItem('sip_gym_logged_phone', phone);
-    setCurrentUser(user);
-    syncDB(users);
-    setIsAuthModalOpen(false);
+    const newUsers = [...allUsers, newUser];
+    syncDB(newUsers);
+    handleLoginSuccess(newUser);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('sip_gym_logged_phone');
     setCurrentUser(null);
   };
-
-  const handleUpdateSubscription = (packageName: string, months: number, price: number) => {
+  
+  const handleUpdateSubscription = (packageName: string, months: number, price: number, voucherCode?: string) => {
     if (!currentUser) return;
-
+    const pkg = packages.find(p => p.name === packageName);
     const newSubscription: Subscription = {
-      name: packageName,
-      months: months,
-      expireDate: null,
-      startDate: Date.now(),
-      price: price,
-      status: 'Pending'
+      name: packageName, 
+      months: months, 
+      expireDate: null, 
+      startDate: Date.now(), 
+      price: pkg ? pkg.price * months : price, 
+      paidAmount: price, 
+      status: 'Pending', 
+      packageImage: pkg?.image,
+      paymentMethod: 'Transfer',
+      voucherCode: voucherCode
     };
+    let updatedUser = { ...currentUser, subscription: newSubscription };
+    if (updatedUser.referralBonusAvailable) updatedUser.referralBonusAvailable = false;
+    else if (updatedUser.referredBy && !updatedUser.hasUsedReferralDiscount) updatedUser.hasUsedReferralDiscount = true;
 
-    const newUsers = allUsers.map(u => {
-      if (u.phone === currentUser.phone) {
-        return { ...u, subscription: newSubscription };
-      }
-      return u;
-    });
+    const newUsers = allUsers.map(u => u.phone === currentUser.phone ? updatedUser : u);
     syncDB(newUsers);
+  };
+
+  const handleRegisterPT = (ptPackage: PTPackage, paidAmount: number, voucherCode?: string) => {
+    if (!currentUser) return;
+    const newPTSub: PTSubscription = {
+      packageId: ptPackage.id, 
+      name: ptPackage.name, 
+      price: ptPackage.price, 
+      paidAmount: paidAmount, 
+      totalSessions: ptPackage.sessions, 
+      sessionsRemaining: ptPackage.sessions, 
+      image: ptPackage.image, 
+      status: 'Pending',
+    };
+    const newUsers = allUsers.map(u => u.phone === currentUser.phone ? { ...u, ptSubscription: newPTSub } : u);
+    syncDB(newUsers);
+  };
+
+  const handleAdminLoginSuccess = (admin: AdminProfile) => {
+    setCurrentAdmin(admin);
+    localStorage.setItem('admin_session', JSON.stringify(admin));
   };
 
   if (isLoading && dbService.isActive) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
       </div>
     );
   }
@@ -235,8 +488,15 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-white flex flex-col overflow-hidden">
       <PWAPrompt />
+      {popupNotification && (
+          <GlobalNotification 
+             title={popupNotification.title} 
+             message={popupNotification.msg} 
+             onClose={() => setPopupNotification(null)} 
+          />
+      )}
       
-      <div className={`flex-1 overflow-y-auto no-scrollbar ${isAdminPath ? 'bg-[#0B0F1A]' : 'bg-[#F8FAFC]'}`}>
+      <div className={`flex-1 overflow-y-auto no-scrollbar ${isAdminPath ? 'bg-[#FFF7ED]' : 'bg-[#FFF7ED]'}`}>
         <Routes>
           <Route 
             path="/" 
@@ -246,23 +506,36 @@ const AppContent: React.FC = () => {
                 promotions={promotions}
                 trainers={trainers}
                 programs={programs}
+                packages={packages}
+                ptPackages={ptPackages}
+                vouchers={vouchers}
+                heroImage={heroImage}
                 onOpenAuth={() => setIsAuthModalOpen(true)} 
                 onLogout={handleLogout}
                 onUpdateUser={syncDB}
                 onUpdateSubscription={handleUpdateSubscription}
+                onRegisterPT={handleRegisterPT}
                 allUsers={allUsers}
+                bookings={bookings}
+                onUpdateBookings={syncBookings}
               />
             } 
           />
-          <Route path="/schedule" element={<TrainingSchedule user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} />} />
+          <Route path="/schedule" element={<TrainingSchedule user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} bookings={bookings} onUpdateBookings={syncBookings} />} />
           <Route path="/voucher" element={<Voucher vouchers={vouchers} />} />
           <Route path="/support" element={<Support user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} />} />
-          <Route path="/profile" element={<Profile user={currentUser} onUpdateSubscription={handleUpdateSubscription} onUpdateUser={syncDB} allUsers={allUsers} />} />
-          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/profile" element={<Profile user={currentUser} onUpdateSubscription={handleUpdateSubscription} onUpdateUser={syncDB} allUsers={allUsers} packages={packages} vouchers={vouchers} />} />
+          <Route 
+             path="/admin" 
+             element={<AdminLogin admins={admins} onLoginSuccess={handleAdminLoginSuccess} />} 
+          />
           <Route 
             path="/admin/dashboard" 
             element={
               <AdminDashboard 
+                currentAdmin={currentAdmin}
+                admins={admins}
+                setAdmins={syncAdmins}
                 allUsers={allUsers} 
                 setAllUsers={syncDB} 
                 promotions={promotions} 
@@ -271,8 +544,21 @@ const AppContent: React.FC = () => {
                 setVouchers={syncVouchers}
                 trainers={trainers} 
                 setTrainers={syncTrainers}
+                packages={packages}
+                setPackages={syncPackages}
                 programs={programs} 
-                setPrograms={(p) => {}} 
+                setPrograms={(p) => {}}
+                ptPackages={ptPackages}
+                setPTPackages={syncPTPackages}
+                heroImage={heroImage}
+                onUpdateHeroImage={syncHeroImage}
+                bookings={bookings}
+                onUpdateBookings={syncBookings}
+                onLogout={() => {
+                  setCurrentAdmin(null);
+                  localStorage.removeItem('admin_session');
+                  navigate('/admin');
+                }}
               />
             } 
           />
@@ -282,7 +568,25 @@ const AppContent: React.FC = () => {
         {!isAdminPath && <div className="h-28"></div>}
       </div>
       {!isAdminPath && <BottomNav />}
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onLogin={handleLogin} />
+      
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        allUsers={allUsers}
+        onLoginSuccess={handleLoginSuccess}
+        onRegister={handleRegister}
+      />
+
+      <SetupPasswordModal
+        isOpen={isSetupPassOpen}
+        onClose={() => { 
+           if(currentUser?.password) setIsSetupPassOpen(false);
+           else handleLogout();
+        }}
+        user={currentUser}
+        allUsers={allUsers}
+        onUpdateUser={syncDB}
+      />
     </div>
   );
 };

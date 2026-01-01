@@ -1,95 +1,286 @@
 
-import React, { useState } from 'react';
-import { X, Smartphone, Info, CheckCircle2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Smartphone, Lock, ScanFace, CheckCircle2, AlertCircle, Camera, User } from 'lucide-react';
+import { UserProfile } from '../App';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (phone: string) => void;
+  allUsers: UserProfile[];
+  onLoginSuccess: (user: UserProfile) => void;
+  onRegister: (phone: string, gender: 'Nam' | 'Nữ' | 'Khác') => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLoginSuccess, onRegister }) => {
+  const [step, setStep] = useState<'phone' | 'register_details' | 'password' | 'face'>('phone');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [gender, setGender] = useState<'Nam' | 'Nữ' | 'Khác'>('Nam');
   const [error, setError] = useState('');
+  const [targetUser, setTargetUser] = useState<UserProfile | null>(null);
+  const [isScanning, setIsScanning] = useState(false); // New state for scanning effect
+  
+  // Camera Refs & State
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+
+  const stopCamera = () => {
+     if (streamRef.current) {
+       streamRef.current.getTracks().forEach(t => t.stop());
+       streamRef.current = null;
+     }
+     if (videoRef.current) {
+       videoRef.current.srcObject = null;
+     }
+  };
+
+  useEffect(() => {
+    return () => { stopCamera(); };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const initCamera = async () => {
+      if (isCameraActive && step === 'face') {
+        try {
+          if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+          if (!mounted) {
+            stream.getTracks().forEach(t => t.stop());
+            return;
+          }
+          streamRef.current = stream;
+          if (videoRef.current) videoRef.current.srcObject = stream;
+        } catch (err: any) {
+          console.error("Camera Error:", err);
+          if (mounted) {
+             setError("Không thể truy cập camera. Vui lòng cấp quyền hoặc dùng mật khẩu.");
+             setIsCameraActive(false);
+          }
+        }
+      } else {
+        stopCamera();
+      }
+    };
+    initCamera();
+    return () => { mounted = false; stopCamera(); };
+  }, [isCameraActive, step]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePhoneSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (phone.length < 10) {
-      setError('Vui lòng nhập số điện thoại hợp lệ (tối thiểu 10 số)');
+      setError('Số điện thoại không hợp lệ');
       return;
     }
-    onLogin(phone);
+    const user = allUsers.find(u => u.phone === phone);
+    if (!user) {
+       setStep('register_details'); // Move to registration details
+    } else {
+       setTargetUser(user);
+       if (!user.password) {
+         onLoginSuccess(user);
+       } else {
+         if (user.loginMethod === 'face' && user.faceData) {
+            setStep('face');
+            setIsCameraActive(true);
+         } else {
+            setStep('password');
+         }
+       }
+    }
+  };
+
+  const handleRegisterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onRegister(phone, gender);
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (targetUser && targetUser.password === password) {
+       onLoginSuccess(targetUser);
+    } else {
+       setError('Mật khẩu không đúng!');
+    }
+  };
+
+  const verifyFace = () => {
+    // Start scanning effect
+    setIsScanning(true);
+    
+    // Simulate processing delay
+    setTimeout(() => {
+        // Capture frame
+        const canvas = document.createElement('canvas');
+        if (videoRef.current) {
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+          canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+          // In a real backend, we'd send `canvas.toDataURL('image/jpeg')` for comparison.
+          // Here we just simulate success if `targetUser` has faceData (checked previously).
+        }
+        
+        stopCamera();
+        setIsCameraActive(false);
+        setIsScanning(false);
+        
+        if (targetUser && targetUser.faceData) {
+            onLoginSuccess(targetUser);
+        } else {
+            setError("Không nhận diện được khuôn mặt. Vui lòng thử lại.");
+        }
+    }, 1500); // 1.5s scanning effect
+  };
+
+  const handleClose = () => {
+    stopCamera();
+    setIsCameraActive(false);
+    setIsScanning(false);
+    setStep('phone');
     setPhone('');
+    setPassword('');
+    setGender('Nam');
     setError('');
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center px-4 animate-in fade-in duration-300">
-      <div 
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
       
       <div className="relative w-full max-w-[400px] bg-white rounded-t-[32px] sm:rounded-[32px] p-8 shadow-2xl animate-in slide-in-from-bottom-10 duration-500">
-        <button 
-          onClick={onClose}
-          className="absolute top-6 right-6 p-2 hover:bg-gray-100 rounded-full transition-colors"
-        >
+        <button onClick={handleClose} className="absolute top-6 right-6 p-2 hover:bg-gray-100 rounded-full transition-colors">
           <X className="w-6 h-6 text-gray-400" />
         </button>
 
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 bg-[#00AEEF]/10 rounded-2xl flex items-center justify-center">
-            <Smartphone className="w-8 h-8 text-[#00AEEF]" />
-          </div>
-        </div>
+        {step === 'phone' && (
+          <>
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-[#FF6B00]/10 rounded-2xl flex items-center justify-center">
+                <Smartphone className="w-8 h-8 text-[#FF6B00]" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-black text-center text-gray-800 mb-2">Đăng Nhập</h2>
+            <p className="text-gray-500 text-center text-sm mb-6 px-4">Nhập số điện thoại để tiếp tục</p>
+            
+            <form onSubmit={handlePhoneSubmit} className="space-y-4">
+               <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => { setPhone(e.target.value); setError(''); }}
+                  placeholder="Số điện thoại..."
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-lg font-bold tracking-widest focus:ring-2 focus:ring-[#FF6B00] outline-none"
+                />
+                {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+                <button type="submit" className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-orange-200 uppercase">Tiếp Tục</button>
+            </form>
+          </>
+        )}
 
-        <h2 className="text-2xl font-black text-center text-gray-800 mb-2">Đăng Nhập Nhanh</h2>
-        <p className="text-gray-500 text-center text-sm mb-8 px-4">
-          Nhập số điện thoại để bắt đầu hành trình cùng Sip Gym Nhà Bè.
-        </p>
+        {step === 'register_details' && (
+           <>
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center">
+                <User className="w-8 h-8 text-blue-500" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-black text-center text-gray-800 mb-2">Thông Tin Bổ Sung</h2>
+            <p className="text-gray-500 text-center text-sm mb-6">Vui lòng chọn giới tính của bạn</p>
 
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-8 flex gap-3">
-          <Info className="w-5 h-5 text-[#00AEEF] shrink-0 mt-0.5" />
-          <div className="text-xs text-blue-800 leading-relaxed">
-            <p className="font-bold mb-1">Tiện lợi & Bảo mật:</p>
-            Hệ thống không yêu cầu mật khẩu hay đăng ký. Số điện thoại là mã định danh duy nhất của bạn để lưu lại toàn bộ tiến trình tập luyện.
-          </div>
-        </div>
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+               <div className="grid grid-cols-3 gap-3">
+                  {(['Nam', 'Nữ', 'Khác'] as const).map(g => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setGender(g)}
+                      className={`py-3 rounded-xl font-bold border-2 transition-all ${gender === g ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00]' : 'border-gray-100 text-gray-400'}`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+               </div>
+               <button type="submit" className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-orange-200 uppercase">Hoàn Tất Đăng Ký</button>
+            </form>
+           </>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, '');
-                setPhone(val);
-                if (error) setError('');
-              }}
-              placeholder="Nhập số điện thoại của bạn..."
-              className={`w-full bg-gray-50 border ${error ? 'border-red-500' : 'border-gray-200'} rounded-2xl py-4 px-6 text-lg font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-[#00AEEF]/20 focus:border-[#00AEEF] transition-all`}
-            />
-            {phone.length >= 10 && (
-              <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 text-green-500 animate-in zoom-in duration-300" />
-            )}
-          </div>
-          
-          {error && <p className="text-red-500 text-xs font-medium ml-2">{error}</p>}
+        {step === 'password' && (
+           <>
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-[#FF6B00]/10 rounded-2xl flex items-center justify-center">
+                <Lock className="w-8 h-8 text-[#FF6B00]" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-black text-center text-gray-800 mb-2">Nhập Mật Khẩu</h2>
+            
+            <form onSubmit={handlePasswordSubmit} className="space-y-4 mt-6">
+               <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                  placeholder="******"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-lg font-bold text-center tracking-widest focus:ring-2 focus:ring-[#FF6B00] outline-none"
+                />
+                {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+                <button type="submit" className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-orange-200 uppercase">Đăng Nhập</button>
+                {targetUser?.faceData && (
+                   <button type="button" onClick={() => { setStep('face'); setIsCameraActive(true); }} className="w-full text-gray-400 font-bold text-xs uppercase hover:text-[#FF6B00]">Đăng nhập bằng Face ID</button>
+                )}
+            </form>
+           </>
+        )}
 
-          <button 
-            type="submit"
-            className="w-full bg-[#00AEEF] hover:bg-[#0096cc] active:scale-[0.98] text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-blue-100 transition-all uppercase tracking-wider"
-          >
-            Tiếp Tục
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-[10px] text-gray-400 uppercase tracking-widest font-bold">
-          Sip Gym Nhà Bè • Professional Training
-        </p>
+        {step === 'face' && (
+           <>
+             <h2 className="text-xl font-black text-center text-gray-800 mb-4">Quét Khuôn Mặt</h2>
+             <div className="relative w-full aspect-square bg-black rounded-3xl overflow-hidden mb-4 border-4 border-[#FF6B00]">
+                <video 
+                   ref={videoRef} 
+                   autoPlay 
+                   playsInline 
+                   muted
+                   className={`w-full h-full object-cover transform scale-x-[-1] ${isCameraActive ? 'opacity-100' : 'opacity-0'}`} 
+                />
+                
+                {/* Scanning Overlay */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                   <div className={`w-48 h-64 border-2 border-white/50 rounded-[40%] relative overflow-hidden`}>
+                      {isScanning && <div className="absolute top-0 left-0 w-full h-1 bg-[#FF6B00] shadow-[0_0_10px_#FF6B00] animate-[scan_1.5s_linear_infinite]"></div>}
+                   </div>
+                </div>
+                <style>{`
+                  @keyframes scan {
+                    0% { top: 0%; opacity: 0; }
+                    10% { opacity: 1; }
+                    90% { opacity: 1; }
+                    100% { top: 100%; opacity: 0; }
+                  }
+                `}</style>
+             </div>
+             
+             {error ? (
+                <div className="text-center">
+                   <p className="text-red-500 text-xs font-bold mb-3">{error}</p>
+                   <div className="flex gap-2 justify-center">
+                     <button onClick={() => { setError(''); setIsCameraActive(true); }} className="bg-[#FF6B00] text-white px-4 py-2 rounded-xl font-bold text-xs uppercase">Thử Lại</button>
+                     <button onClick={() => { stopCamera(); setIsCameraActive(false); setStep('password'); }} className="bg-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-xs uppercase">Dùng Mật Khẩu</button>
+                   </div>
+                </div>
+             ) : (
+                <button 
+                  onClick={verifyFace} 
+                  disabled={isScanning}
+                  className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                   {isScanning ? <span className="animate-pulse">Đang xác thực...</span> : <><ScanFace className="w-6 h-6" /> Quét Ngay</>}
+                </button>
+             )}
+           </>
+        )}
       </div>
     </div>
   );

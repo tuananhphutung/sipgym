@@ -2,8 +2,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Lock, User } from 'lucide-react';
+import { AdminProfile } from '../App';
 
-const AdminLogin: React.FC = () => {
+interface AdminLoginProps {
+  admins?: AdminProfile[];
+  onLoginSuccess?: (admin: AdminProfile) => void;
+}
+
+const AdminLogin: React.FC<AdminLoginProps> = ({ admins = [], onLoginSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -11,8 +17,15 @@ const AdminLogin: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === 'admin' && password === '123456') {
-      localStorage.setItem('admin_logged', 'true');
+    
+    // Check against admins list props or default hardcoded for safety fallback
+    const admin = admins.find(a => a.username === username && a.password === password);
+
+    if (admin) {
+      if (onLoginSuccess) {
+         onLoginSuccess(admin);
+      }
+      localStorage.setItem('admin_logged', 'true'); // Keep for legacy check if needed
       navigate('/admin/dashboard');
     } else {
       setError('Sai tài khoản hoặc mật khẩu!');
