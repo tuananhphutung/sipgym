@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Smartphone, Lock, ScanFace, CheckCircle2, AlertCircle, Camera, User } from 'lucide-react';
+import { X, Smartphone, Lock, ScanFace, CheckCircle2, AlertCircle, Camera, User, Mail, ShieldCheck } from 'lucide-react';
 import { UserProfile } from '../App';
 
 interface AuthModalProps {
@@ -9,18 +9,24 @@ interface AuthModalProps {
   allUsers: UserProfile[];
   onLoginSuccess: (user: UserProfile) => void;
   onRegister: (phone: string, gender: 'Nam' | 'Nữ' | 'Khác') => void;
+  onResetPassword?: (phone: string, newPass: string) => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLoginSuccess, onRegister }) => {
-  const [step, setStep] = useState<'phone' | 'register_details' | 'password' | 'face'>('phone');
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLoginSuccess, onRegister, onResetPassword }) => {
+  const [step, setStep] = useState<'phone' | 'register_details' | 'password' | 'face' | 'forgot_password' | 'reset_new_pass'>('phone');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [gender, setGender] = useState<'Nam' | 'Nữ' | 'Khác'>('Nam');
   const [error, setError] = useState('');
   const [targetUser, setTargetUser] = useState<UserProfile | null>(null);
-  const [isScanning, setIsScanning] = useState(false); // New state for scanning effect
+  const [isScanning, setIsScanning] = useState(false); 
   
-  // Camera Refs & State
+  // Forgot Password States
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  
+  // Camera Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -106,33 +112,48 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
        setError('Mật khẩu không đúng!');
     }
   };
+  
+  const handleForgotRequest = (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!resetEmail.includes('@')) {
+         setError("Email không hợp lệ");
+         return;
+     }
+     // Mock sending email
+     alert(`Mã xác nhận đã được gửi đến ${resetEmail} (Mã giả lập: 123456)`);
+     setStep('reset_new_pass');
+  };
+  
+  const handleResetConfirm = (e: React.FormEvent) => {
+     e.preventDefault();
+     if (resetCode !== '123456') {
+         setError("Mã xác nhận không đúng (Dùng 123456)");
+         return;
+     }
+     if (newPassword.length < 6) {
+         setError("Mật khẩu phải từ 6 ký tự");
+         return;
+     }
+     if (targetUser && onResetPassword) {
+         onResetPassword(targetUser.phone, newPassword);
+         alert("Đổi mật khẩu thành công! Vui lòng đăng nhập lại.");
+         setStep('password');
+         setPassword('');
+     }
+  };
 
   const verifyFace = () => {
-    // Start scanning effect
     setIsScanning(true);
-    
-    // Simulate processing delay
     setTimeout(() => {
-        // Capture frame
-        const canvas = document.createElement('canvas');
-        if (videoRef.current) {
-          canvas.width = videoRef.current.videoWidth;
-          canvas.height = videoRef.current.videoHeight;
-          canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
-          // In a real backend, we'd send `canvas.toDataURL('image/jpeg')` for comparison.
-          // Here we just simulate success if `targetUser` has faceData (checked previously).
-        }
-        
         stopCamera();
         setIsCameraActive(false);
         setIsScanning(false);
-        
         if (targetUser && targetUser.faceData) {
             onLoginSuccess(targetUser);
         } else {
             setError("Không nhận diện được khuôn mặt. Vui lòng thử lại.");
         }
-    }, 1500); // 1.5s scanning effect
+    }, 1500); 
   };
 
   const handleClose = () => {
@@ -144,6 +165,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
     setPassword('');
     setGender('Nam');
     setError('');
+    setResetEmail('');
+    setResetCode('');
+    setNewPassword('');
     onClose();
   };
 
@@ -227,11 +251,69 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
                 />
                 {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
                 <button type="submit" className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-orange-200 uppercase">Đăng Nhập</button>
-                {targetUser?.faceData && (
-                   <button type="button" onClick={() => { setStep('face'); setIsCameraActive(true); }} className="w-full text-gray-400 font-bold text-xs uppercase hover:text-[#FF6B00]">Đăng nhập bằng Face ID</button>
-                )}
+                
+                <div className="flex justify-between items-center mt-4 px-1">
+                    {targetUser?.faceData && (
+                       <button type="button" onClick={() => { setStep('face'); setIsCameraActive(true); }} className="text-gray-400 font-bold text-xs uppercase hover:text-[#FF6B00]">Dùng Face ID</button>
+                    )}
+                    <button type="button" onClick={() => { setStep('forgot_password'); setError(''); }} className="text-gray-400 font-bold text-xs uppercase hover:text-[#FF6B00] ml-auto">Quên mật khẩu?</button>
+                </div>
             </form>
            </>
+        )}
+        
+        {step === 'forgot_password' && (
+            <>
+                <div className="flex justify-center mb-6">
+                    <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center">
+                        <Mail className="w-8 h-8 text-purple-500" />
+                    </div>
+                </div>
+                <h2 className="text-xl font-black text-center text-gray-800 mb-2">Quên Mật Khẩu</h2>
+                <p className="text-gray-500 text-center text-xs mb-6 px-4">Nhập Email để nhận mã xác thực lấy lại mật khẩu.</p>
+                <form onSubmit={handleForgotRequest} className="space-y-4">
+                    <input 
+                       type="email"
+                       value={resetEmail}
+                       onChange={e => setResetEmail(e.target.value)}
+                       placeholder="Email của bạn..."
+                       className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-sm font-bold focus:ring-2 focus:ring-purple-200 outline-none"
+                    />
+                    {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+                    <button type="submit" className="w-full bg-purple-500 text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-purple-200 uppercase">Gửi Mã Xác Nhận</button>
+                </form>
+                <button onClick={() => setStep('password')} className="w-full mt-4 text-gray-400 font-bold text-xs uppercase">Quay lại</button>
+            </>
+        )}
+        
+        {step === 'reset_new_pass' && (
+            <>
+                <div className="flex justify-center mb-6">
+                    <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center">
+                        <ShieldCheck className="w-8 h-8 text-green-500" />
+                    </div>
+                </div>
+                <h2 className="text-xl font-black text-center text-gray-800 mb-2">Đặt Lại Mật Khẩu</h2>
+                
+                <form onSubmit={handleResetConfirm} className="space-y-4">
+                    <input 
+                       type="text"
+                       value={resetCode}
+                       onChange={e => setResetCode(e.target.value)}
+                       placeholder="Mã xác nhận (VD: 123456)"
+                       className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-center text-lg font-black tracking-widest focus:ring-2 focus:ring-green-200 outline-none"
+                    />
+                    <input 
+                       type="password"
+                       value={newPassword}
+                       onChange={e => setNewPassword(e.target.value)}
+                       placeholder="Mật khẩu mới"
+                       className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-sm font-bold focus:ring-2 focus:ring-green-200 outline-none"
+                    />
+                    {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+                    <button type="submit" className="w-full bg-green-500 text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-green-200 uppercase">Đổi Mật Khẩu</button>
+                </form>
+            </>
         )}
 
         {step === 'face' && (
@@ -246,7 +328,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
                    className={`w-full h-full object-cover transform scale-x-[-1] ${isCameraActive ? 'opacity-100' : 'opacity-0'}`} 
                 />
                 
-                {/* Scanning Overlay */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                    <div className={`w-48 h-64 border-2 border-white/50 rounded-[40%] relative overflow-hidden`}>
                       {isScanning && <div className="absolute top-0 left-0 w-full h-1 bg-[#FF6B00] shadow-[0_0_10px_#FF6B00] animate-[scan_1.5s_linear_infinite]"></div>}

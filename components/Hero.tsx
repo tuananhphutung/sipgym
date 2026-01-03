@@ -3,10 +3,14 @@ import React from 'react';
 
 interface HeroProps {
   image?: string;
+  title?: string;
+  subtitle?: string;
 }
 
-const Hero: React.FC<HeroProps> = ({ image }) => {
+const Hero: React.FC<HeroProps> = ({ image, title, subtitle }) => {
   const bgImage = image || "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600";
+  const mainTitle = title || "CÂU LẠC\nBỘ\nGYM";
+  const sub = subtitle || "GYM CHO MỌI NGƯỜI";
 
   return (
     <div className="relative pt-2 pb-6">
@@ -25,11 +29,11 @@ const Hero: React.FC<HeroProps> = ({ image }) => {
 
         {/* Text */}
         <div className="relative w-full text-center sm:text-left">
-          <h1 className="text-[#FF6B00] font-[900] text-4xl leading-[0.9] tracking-tighter uppercase italic drop-shadow-sm">
-            CÂU LẠC<br />BỘ<br />GYM
+          <h1 className="text-[#FF6B00] font-[900] text-4xl leading-[0.9] tracking-tighter uppercase italic drop-shadow-sm whitespace-pre-line">
+            {mainTitle}
           </h1>
           <div className="inline-block mt-2 bg-[#2ECC71] text-white text-[10px] px-4 py-1.5 rounded-full font-black uppercase tracking-wider shadow-md">
-            GYM CHO MỌI NGƯỜI
+            {sub}
           </div>
         </div>
       </div>

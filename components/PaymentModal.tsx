@@ -156,14 +156,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                         <button
                             key={pkg.id}
                             onClick={() => setSelectedPackage(pkg)}
-                            className={`flex items-center gap-4 p-3 rounded-2xl border-2 w-full transition-all ${selectedPackage?.id === pkg.id ? 'border-[#FF6B00] bg-orange-50' : 'border-gray-100'}`}
+                            className={`flex flex-col gap-2 p-3 rounded-2xl border-2 w-full transition-all text-left ${selectedPackage?.id === pkg.id ? 'border-[#FF6B00] bg-orange-50' : 'border-gray-100'}`}
                         >
-                            <img src={pkg.image} className="w-16 h-16 rounded-xl object-cover" />
-                            <div className="text-left flex-1">
-                                <p className="font-bold text-gray-800">{pkg.name}</p>
-                                <p className="text-xs text-gray-500">{pkg.price.toLocaleString()}đ/tháng</p>
+                            <div className="flex items-center gap-4">
+                                <img src={pkg.image} className="w-16 h-16 rounded-xl object-cover" />
+                                <div className="text-left flex-1">
+                                    <p className="font-bold text-gray-800">{pkg.name}</p>
+                                    <p className="text-xs text-gray-500">{pkg.price.toLocaleString()}đ/tháng</p>
+                                </div>
+                                {selectedPackage?.id === pkg.id && <CheckCircle2 className="w-6 h-6 text-[#FF6B00]" />}
                             </div>
-                            {selectedPackage?.id === pkg.id && <CheckCircle2 className="w-6 h-6 text-[#FF6B00]" />}
+                            {pkg.description && (
+                                <p className="text-[10px] text-gray-500 italic bg-white/50 p-2 rounded-lg border border-gray-50">{pkg.description}</p>
+                            )}
                         </button>
                     ))}
                     
@@ -205,6 +210,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                                  <p className="text-xs text-gray-500">{type === 'gym' ? selectedDuration?.label : `${ptPackage?.sessions} buổi`}</p>
                              </div>
                         </div>
+                        
+                        {(type === 'pt' && ptPackage?.description) && (
+                            <p className="text-[10px] text-gray-500 italic mb-2">{ptPackage.description}</p>
+                        )}
                         
                         <div className="space-y-2 text-xs font-medium text-gray-500">
                             <div className="flex justify-between">

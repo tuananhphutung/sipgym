@@ -12,7 +12,7 @@ import BottomNav from './components/BottomNav';
 import AuthModal from './components/AuthModal';
 import SetupPasswordModal from './components/SetupPasswordModal';
 import PWAPrompt from './components/PWAPrompt';
-import GlobalNotification from './components/GlobalNotification'; // New Component
+import GlobalNotification from './components/GlobalNotification'; 
 import { dbService } from './services/firebase';
 
 export interface PackageItem {
@@ -27,8 +27,9 @@ export interface PTPackage {
   id: string;
   name: string;
   price: number;
-  sessions: number; // Số buổi tập
+  sessions: number; 
   image: string;
+  description?: string;
 }
 
 export interface Subscription {
@@ -37,7 +38,7 @@ export interface Subscription {
   expireDate: number | null;
   startDate: number;
   price: number;
-  paidAmount: number; // Số tiền thực trả
+  paidAmount: number; 
   paymentMethod?: string;
   voucherCode?: string;
   status: 'Pending' | 'Active' | 'Expired' | 'Rejected' | 'Pending Preservation' | 'Preserved';
@@ -48,7 +49,7 @@ export interface PTSubscription {
   packageId: string;
   name: string;
   price: number;
-  paidAmount: number; // Số tiền thực trả
+  paidAmount: number; 
   totalSessions: number;
   sessionsRemaining: number;
   image: string;
@@ -63,12 +64,12 @@ export interface Booking {
   userAvatar?: string;
   trainerId: string;
   trainerName: string;
-  date: string; // YYYY-MM-DD
-  timeSlot: string; // "09:00 - 10:00"
+  date: string; 
+  timeSlot: string; 
   status: 'Pending' | 'Approved' | 'Completed' | 'Rejected';
   rating?: number;
   comment?: string;
-  media?: string[]; // URLs images/videos
+  media?: string[]; 
   timestamp: number;
 }
 
@@ -93,8 +94,9 @@ export interface UserProfile {
   loginMethod?: 'password' | 'face';
   gender?: 'Nam' | 'Nữ' | 'Khác'; 
   
-  realName?: string; // Tên thật (Chỉ Admin sửa)
-  name?: string; // Biệt danh (User hiển thị)
+  realName?: string; 
+  name?: string; 
+  email?: string; // Added email for recovery
   
   avatar: string | null;
   subscription: Subscription | null;
@@ -113,7 +115,6 @@ export interface UserProfile {
   };
 }
 
-// --- ADMIN INTERFACES ---
 export type AdminPermission = 
   | 'view_users' | 'approve_users' | 'view_revenue' | 'view_revenue_details'
   | 'send_notification' | 'edit_user_settings' | 'manage_user' | 'chat_user'
@@ -122,7 +123,7 @@ export type AdminPermission =
 
 export interface AdminProfile {
   username: string;
-  password?: string; // In real app, hash this
+  password?: string; 
   role: 'super_admin' | 'sub_admin';
   name: string;
   permissions: AdminPermission[];
@@ -131,7 +132,6 @@ export interface AdminProfile {
     showPopupNoti: boolean;
   };
 }
-// ------------------------
 
 export interface Promotion {
   id: string;
@@ -145,9 +145,9 @@ export interface VoucherItem {
   title: string;
   code: string;
   type: 'Gym' | 'PT' | 'Gift';
-  value: number; // 0.1 = 10%
+  value: number; 
   color: string;
-  image?: string; // Added image for voucher
+  image?: string; 
 }
 
 export interface Trainer {
@@ -176,6 +176,8 @@ const AppContent: React.FC = () => {
 
   // App Settings State
   const [heroImage, setHeroImage] = useState<string>('https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600');
+  const [heroTitle, setHeroTitle] = useState<string>('CÂU LẠC\nBỘ\nGYM');
+  const [heroSubtitle, setHeroSubtitle] = useState<string>('GYM CHO MỌI NGƯỜI');
 
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [vouchers, setVouchers] = useState<VoucherItem[]>([
@@ -186,13 +188,13 @@ const AppContent: React.FC = () => {
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   
   const [packages, setPackages] = useState<PackageItem[]>([
-    { id: 'gym', name: 'Gói Gym', price: 500000, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300' },
-    { id: 'groupx', name: 'Gói Group X', price: 800000, image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=300' },
+    { id: 'gym', name: 'Gói Gym', price: 500000, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300', description: 'Tập gym không giới hạn thời gian.' },
+    { id: 'groupx', name: 'Gói Group X', price: 800000, image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=300', description: 'Bao gồm Yoga, Zumba, Aerobic.' },
   ]);
 
   const [ptPackages, setPTPackages] = useState<PTPackage[]>([
-     { id: 'pt1', name: 'PT 1 Kèm 1 (12 Buổi)', price: 3600000, sessions: 12, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&q=80&w=300' },
-     { id: 'pt2', name: 'PT 1 Kèm 1 (24 Buổi)', price: 6500000, sessions: 24, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300' }
+     { id: 'pt1', name: 'PT 1 Kèm 1 (12 Buổi)', price: 3600000, sessions: 12, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&q=80&w=300', description: 'HLV kèm 1-1, lên thực đơn dinh dưỡng.' },
+     { id: 'pt2', name: 'PT 1 Kèm 1 (24 Buổi)', price: 6500000, sessions: 24, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300', description: 'Cam kết thay đổi hình thể.' }
   ]);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -207,22 +209,13 @@ const AppContent: React.FC = () => {
 
   const isAdminPath = location.pathname.startsWith('/admin');
 
-  // Initialize Default Super Admin
   useEffect(() => {
     const savedAdminsStr = localStorage.getItem('sip_gym_admins_db');
     let adminList: AdminProfile[] = [];
-
     if (savedAdminsStr) {
-      try {
-        adminList = JSON.parse(savedAdminsStr);
-      } catch (e) {
-        adminList = [];
-      }
+      try { adminList = JSON.parse(savedAdminsStr); } catch (e) { adminList = []; }
     }
-
-    // Ensure super admin 'admin' exists
     const adminIndex = adminList.findIndex(a => a.username === 'admin');
-    
     if (adminIndex === -1) {
         adminList.push({
             username: 'admin',
@@ -233,11 +226,6 @@ const AppContent: React.FC = () => {
             settings: { showFloatingMenu: true, showPopupNoti: true }
         });
         localStorage.setItem('sip_gym_admins_db', JSON.stringify(adminList));
-    } else {
-        if (adminList[adminIndex].password !== '123456') {
-            adminList[adminIndex].password = '123456';
-            localStorage.setItem('sip_gym_admins_db', JSON.stringify(adminList));
-        }
     }
     setAdmins(adminList);
   }, []);
@@ -247,16 +235,13 @@ const AppContent: React.FC = () => {
     localStorage.setItem('sip_gym_admins_db', JSON.stringify(newAdmins));
     if (currentAdmin) {
       const updatedMe = newAdmins.find(a => a.username === currentAdmin.username);
-      if (updatedMe) setCurrentAdmin(updatedMe);
+      if (updatedMe) setCurrentUser(updatedMe as any); // Type cast for simplicity in mixed context
     }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-        setIsLoading(false);
-    }, 1500);
+    const timer = setTimeout(() => { setIsLoading(false); }, 1500);
 
-    // 1. Users & Notifications Logic
     dbService.subscribe('users', (data: any) => {
       const rawList = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
       const sanitizedUsers: UserProfile[] = rawList.map((u: any) => ({
@@ -264,24 +249,21 @@ const AppContent: React.FC = () => {
         notifications: Array.isArray(u.notifications) ? u.notifications : (u.notifications ? Object.values(u.notifications) : []),
         messages: Array.isArray(u.messages) ? u.messages : (u.messages ? Object.values(u.messages) : []),
         trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : []),
-        settings: u.settings || { popupNotification: true } // Default ON
+        settings: u.settings || { popupNotification: true }
       }));
 
-      // Detect changes for Current User to show Popup
       const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
       if (loggedPhone) {
         const newUserState = sanitizedUsers.find(u => u.phone === loggedPhone);
         const oldUserState = allUsers.find(u => u.phone === loggedPhone);
         
         if (newUserState && oldUserState) {
-             // Check new notifications
              if (newUserState.notifications.length > oldUserState.notifications.length) {
                  const newNoti = newUserState.notifications[0];
                  if (newUserState.settings?.popupNotification && !newNoti.read) {
                      setPopupNotification({ title: 'Thông báo mới', msg: newNoti.text });
                  }
              }
-             // Check new messages
              if (newUserState.messages.length > oldUserState.messages.length) {
                  const lastMsg = newUserState.messages[newUserState.messages.length - 1];
                  if (lastMsg.sender === 'admin' && newUserState.settings?.popupNotification) {
@@ -289,53 +271,28 @@ const AppContent: React.FC = () => {
                  }
              }
         }
-
         if (newUserState) {
           setCurrentUser(newUserState);
-          if (!newUserState.password) {
-            setIsSetupPassOpen(true);
-          }
+          if (!newUserState.password) setIsSetupPassOpen(true);
         }
       }
-
       setAllUsers(sanitizedUsers);
       setIsLoading(false);
     });
 
-    // Subscribe Bookings
     dbService.subscribe('bookings', (data: any) => {
        let rawBookings = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-       
-       // ADD SAMPLE RATINGS IF EMPTY FOR DEMO
-       if (rawBookings.length === 0) {
-           rawBookings = [
-               {
-                   id: 'sample1', userId: '0901234567', userName: 'Nguyễn Văn A', userAvatar: '', trainerId: 't1', trainerName: 'HLV Tuấn Anh',
-                   date: '2023-12-01', timeSlot: '09:00 - 10:00', status: 'Completed', rating: 5, comment: 'Tập rất nhiệt tình, đúng kỹ thuật! Phòng tập sạch sẽ.', timestamp: Date.now() - 100000
-               },
-               {
-                   id: 'sample2', userId: '0909876543', userName: 'Trần Thị B', userAvatar: '', trainerId: 't2', trainerName: 'HLV Minh Thư',
-                   date: '2023-12-02', timeSlot: '17:00 - 18:00', status: 'Completed', rating: 4, comment: 'Bài tập cardio hôm nay hơi nặng nhưng rất đã.', timestamp: Date.now() - 50000
-               },
-               {
-                   id: 'sample3', userId: '0912345678', userName: 'Lê C', userAvatar: '', trainerId: 't1', trainerName: 'HLV Tuấn Anh',
-                   date: '2023-12-03', timeSlot: '18:00 - 19:00', status: 'Pending', rating: 0, comment: '', timestamp: Date.now()
-               }
-           ];
-           dbService.saveAll('bookings', rawBookings);
-       }
-
        setBookings(rawBookings as Booking[]);
     });
 
-    // Subscribe to App Settings (Hero Image)
     dbService.subscribe('app_settings', (data: any) => {
-        if (data && data.heroImage) {
-            setHeroImage(data.heroImage);
+        if (data) {
+            if (data.heroImage) setHeroImage(data.heroImage);
+            if (data.heroTitle) setHeroTitle(data.heroTitle);
+            if (data.heroSubtitle) setHeroSubtitle(data.heroSubtitle);
         }
     });
 
-    // Subscriptions for other data...
     dbService.subscribe('promos', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
       if (list.length > 0) setPromotions(list as Promotion[]);
@@ -361,13 +318,11 @@ const AppContent: React.FC = () => {
       if (list.length > 0) setPTPackages(list as PTPackage[]);
     });
 
-    // Check for logged in admin session
     const adminSession = localStorage.getItem('admin_session');
     if (adminSession) {
        const savedAdmin = JSON.parse(adminSession);
        setCurrentAdmin(savedAdmin);
     }
-
     return () => clearTimeout(timer);
   }, [allUsers.length]); 
 
@@ -386,9 +341,11 @@ const AppContent: React.FC = () => {
       dbService.saveAll('bookings', newBookings);
   };
   
-  const syncHeroImage = (url: string) => {
-      setHeroImage(url);
-      dbService.saveAll('app_settings', { heroImage: url });
+  const syncAppConfig = (config: { heroImage: string, heroTitle: string, heroSubtitle: string }) => {
+      setHeroImage(config.heroImage);
+      setHeroTitle(config.heroTitle);
+      setHeroSubtitle(config.heroSubtitle);
+      dbService.saveAll('app_settings', config);
   };
   
   const syncVouchers = (newVouchers: VoucherItem[]) => { setVouchers(newVouchers); dbService.saveAll('vouchers', newVouchers); };
@@ -444,7 +401,7 @@ const AppContent: React.FC = () => {
       price: pkg ? pkg.price * months : price, 
       paidAmount: price, 
       status: 'Pending', 
-      packageImage: pkg?.image,
+      packageImage: pkg?.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300',
       paymentMethod: 'Transfer',
       voucherCode: voucherCode
     };
@@ -510,6 +467,8 @@ const AppContent: React.FC = () => {
                 ptPackages={ptPackages}
                 vouchers={vouchers}
                 heroImage={heroImage}
+                heroTitle={heroTitle}
+                heroSubtitle={heroSubtitle}
                 onOpenAuth={() => setIsAuthModalOpen(true)} 
                 onLogout={handleLogout}
                 onUpdateUser={syncDB}
@@ -551,7 +510,9 @@ const AppContent: React.FC = () => {
                 ptPackages={ptPackages}
                 setPTPackages={syncPTPackages}
                 heroImage={heroImage}
-                onUpdateHeroImage={syncHeroImage}
+                heroTitle={heroTitle}
+                heroSubtitle={heroSubtitle}
+                onUpdateAppConfig={syncAppConfig}
                 bookings={bookings}
                 onUpdateBookings={syncBookings}
                 onLogout={() => {
@@ -575,6 +536,10 @@ const AppContent: React.FC = () => {
         allUsers={allUsers}
         onLoginSuccess={handleLoginSuccess}
         onRegister={handleRegister}
+        onResetPassword={(phone, newPass) => {
+            const newUsers = allUsers.map(u => u.phone === phone ? { ...u, password: newPass } : u);
+            syncDB(newUsers);
+        }}
       />
 
       <SetupPasswordModal

@@ -9,7 +9,7 @@ import {
   Calendar, Settings, Search, Send, ArrowRight,
   Megaphone, UserPlus, ListFilter, Package, PauseCircle, Trash2, Dumbbell,
   UserCheck, Menu, Eye, ShieldAlert, BadgeCheck, Pencil, CreditCard, Image as ImageIcon2, Clock,
-  CalendarCheck, AlertCircle
+  CalendarCheck, AlertCircle, Save, Upload, Type
 } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 
@@ -31,8 +31,12 @@ interface AdminDashboardProps {
   setPrograms: (programs: TrainingProgram[]) => void;
   ptPackages: PTPackage[];
   setPTPackages: (packages: PTPackage[]) => void;
+  
   heroImage: string;
-  onUpdateHeroImage: (url: string) => void;
+  heroTitle: string;
+  heroSubtitle: string;
+  onUpdateAppConfig: (config: {heroImage: string, heroTitle: string, heroSubtitle: string}) => void;
+  
   bookings: Booking[];
   onUpdateBookings: (bookings: Booking[]) => void;
   onLogout: () => void;
@@ -60,7 +64,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   allUsers, setAllUsers, promotions, setPromos, 
   vouchers, setVouchers, trainers, setTrainers,
   packages, setPackages, ptPackages, setPTPackages,
-  heroImage, onUpdateHeroImage, bookings, onUpdateBookings,
+  heroImage, heroTitle, heroSubtitle, onUpdateAppConfig, 
+  bookings, onUpdateBookings,
   onLogout
 }) => {
   const navigate = useNavigate();
@@ -84,18 +89,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newPromo, setNewPromo] = useState({ title: '', image: '' });
   const [newVoucher, setNewVoucher] = useState({ title: '', code: '', type: 'Gym' as const, value: 0.1, color: 'bg-orange-500', image: '' });
   const [newPT, setNewPT] = useState({ name: '', specialty: '', image: '', rating: 5 });
-  const [newPackage, setNewPackage] = useState({ name: '', price: '', image: '' });
-  const [newPTPackage, setNewPTPackage] = useState({ name: '', price: '', sessions: '', image: '' });
-  const [newHeroImage, setNewHeroImage] = useState('');
+  
+  const [newPackage, setNewPackage] = useState({ name: '', price: '', image: '', description: '' });
+  const [newPTPackage, setNewPTPackage] = useState({ name: '', price: '', sessions: '', image: '', description: '' });
+  
+  // Hero Config State
+  const [configHero, setConfigHero] = useState({ image: '', title: '', subtitle: '' });
 
-  // Edit User Names
+  // Edit User State
   const [editingRealName, setEditingRealName] = useState('');
-
+  const [editingUserAvatar, setEditingUserAvatar] = useState('');
+  
   // Admin Management State
   const [newAdmin, setNewAdmin] = useState<Partial<AdminProfile>>({ username: '', password: '', name: '', role: 'sub_admin', permissions: [], settings: { showFloatingMenu: true, showPopupNoti: true } });
 
   // Floating Menu State
   const [isFloatingMenuOpen, setIsFloatingMenuOpen] = useState(false);
+
+  // Admin Notification Toast State (Auto Hide)
+  const [showAdminToast, setShowAdminToast] = useState(true);
 
   useEffect(() => {
     if (!currentAdmin) {
@@ -111,13 +123,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [showPopup, allUsers, selectedUserPhone]);
 
-  // Sync editing name when user is selected - FIX: Ensure this updates when modal opens
+  // Sync editing name/avatar when user is selected for editing
   const selectedUser = allUsers.find(u => u.phone === selectedUserPhone);
   useEffect(() => {
       if (showPopup === 'user_settings' && selectedUser) {
           setEditingRealName(selectedUser.realName || '');
+          setEditingUserAvatar(selectedUser.avatar || '');
+          setGiftDays('');
       }
   }, [showPopup, selectedUser]);
+  
+  // Initialize config hero state when popup opens
+  useEffect(() => {
+      if (showPopup === 'config_hero') {
+          setConfigHero({ image: heroImage, title: heroTitle, subtitle: heroSubtitle });
+      }
+  }, [showPopup, heroImage, heroTitle, heroSubtitle]);
 
   // Permission Checker
   const hasPermission = (perm: AdminPermission) => {
@@ -133,6 +154,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const pendingBookings = bookings.filter(b => b.status === 'Pending');
   
   const totalPendingApprovals = pendingUsers.length + pendingPTUsers.length + pendingPreserveUsers.length + pendingBookings.length;
+
+  // Logic to auto-hide Admin Notification Toast
+  useEffect(() => {
+      if (totalPendingApprovals > 0) {
+          setShowAdminToast(true);
+          const timer = setTimeout(() => {
+              setShowAdminToast(false);
+          }, 6000);
+          return () => clearTimeout(timer);
+      } else {
+          setShowAdminToast(false);
+      }
+  }, [totalPendingApprovals]);
 
   const filteredUsers = allUsers.filter(u => 
      u.phone.includes(searchTerm) || 
@@ -175,7 +209,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDeleteUser = () => { if (!selectedUserPhone) return; if (window.confirm("BẠN CÓ CHẮC MUỐN XÓA USER NÀY? Hành động này không thể hoàn tác.")) { const newUsers = allUsers.filter(u => u.phone !== selectedUserPhone); setAllUsers(newUsers); setShowPopup(null); alert("Đã xóa user thành công."); } };
   
   const handleApprove = (phone: string) => { 
-      const newUsers = allUsers.map(u => { 
+      // Ensure we're working with fresh data
+      const updatedUsers = allUsers.map(u => { 
           if (u.phone === phone && u.subscription) { 
               const startDate = Date.now(); 
               const expireDate = startDate + u.subscription.months * 30 * 24 * 60 * 60 * 1000; 
@@ -186,11 +221,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }; 
           } return u; 
       }); 
-      setAllUsers(newUsers); 
+      setAllUsers(updatedUsers); 
   };
 
   const handleApprovePT = (phone: string) => { 
-      const newUsers = allUsers.map(u => { 
+      const updatedUsers = allUsers.map(u => { 
           if (u.phone === phone && u.ptSubscription) { 
               return { 
                   ...u, 
@@ -199,11 +234,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }; 
           } return u; 
       }); 
-      setAllUsers(newUsers); 
+      setAllUsers(updatedUsers); 
   };
 
   const handleApprovePreservation = (phone: string) => { 
-      const newUsers = allUsers.map(u => { 
+      const updatedUsers = allUsers.map(u => { 
           if (u.phone === phone && u.subscription) { 
               return { 
                   ...u, 
@@ -212,7 +247,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }; 
           } return u; 
       }); 
-      setAllUsers(newUsers); 
+      setAllUsers(updatedUsers); 
   };
   
   const handleBroadcast = () => { 
@@ -233,7 +268,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert(`Đã gửi thông báo đến ${targets.length} hội viên!`); 
   };
 
-  const handleSaveHeroImage = () => { if(newHeroImage) { onUpdateHeroImage(newHeroImage); setShowPopup(null); alert("Cập nhật banner thành công!"); } };
+  const handleSaveAppConfig = () => { 
+      onUpdateAppConfig({ 
+          heroImage: configHero.image, 
+          heroTitle: configHero.title, 
+          heroSubtitle: configHero.subtitle 
+      }); 
+      setShowPopup(null); 
+      alert("Cập nhật giao diện thành công!"); 
+  };
+
   const handleCreateAdmin = () => { if (!newAdmin.username || !newAdmin.password || !newAdmin.name) return; const newAdminProfile: AdminProfile = { username: newAdmin.username, password: newAdmin.password, name: newAdmin.name, role: 'sub_admin', permissions: newAdmin.permissions || [], settings: { showFloatingMenu: true, showPopupNoti: true } }; setAdmins([...admins, newAdminProfile]); setNewAdmin({ username: '', password: '', name: '', role: 'sub_admin', permissions: [], settings: { showFloatingMenu: true, showPopupNoti: true } }); alert("Đã tạo Admin mới thành công!"); };
   const handleToggleAdminPermission = (perm: AdminPermission) => { const currentPerms = newAdmin.permissions || []; if (currentPerms.includes(perm)) { setNewAdmin({ ...newAdmin, permissions: currentPerms.filter(p => p !== perm) }); } else { setNewAdmin({ ...newAdmin, permissions: [...currentPerms, perm] }); } };
   const toggleFloatingMenuSetting = () => { if (!currentAdmin) return; const newSettings = { ...currentAdmin.settings, showFloatingMenu: !currentAdmin.settings.showFloatingMenu }; const updatedAdmin = { ...currentAdmin, settings: newSettings }; const updatedAdmins = admins.map(a => a.username === currentAdmin.username ? updatedAdmin : a); setAdmins(updatedAdmins); };
@@ -243,13 +287,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       let total = 0; 
       const checkDate = new Date(revenueDate).toDateString(); 
       allUsers.forEach(user => { 
-          // Check Gym Subscription Start Date
           if (user.subscription && user.subscription.status === 'Active' && user.subscription.startDate) { 
               if (new Date(user.subscription.startDate).toDateString() === checkDate) { 
                   total += (user.subscription.paidAmount || user.subscription.price); 
               } 
           } 
-          // Check PT Subscription Start Date
           if (user.ptSubscription && user.ptSubscription.status === 'Active' && user.ptSubscription.startDate) { 
               if (new Date(user.ptSubscription.startDate).toDateString() === checkDate) { 
                   total += (user.ptSubscription.paidAmount || user.ptSubscription.price); 
@@ -259,11 +301,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return total; 
   };
 
-  const saveRealName = () => { 
-      if (!selectedUserPhone || !editingRealName.trim()) return; 
-      const newUsers = allUsers.map(u => u.phone === selectedUserPhone ? { ...u, realName: editingRealName } : u); 
+  const handleSaveUserDetails = () => { 
+      if (!selectedUserPhone) return; 
+      
+      const newUsers = allUsers.map(u => u.phone === selectedUserPhone ? { 
+          ...u, 
+          realName: editingRealName,
+          avatar: editingUserAvatar
+      } : u); 
+      
       setAllUsers(newUsers); 
-      alert("Đã cập nhật tên thật thành công!"); 
+      setShowPopup(null);
+      alert("Đã cập nhật thông tin hội viên thành công!"); 
   };
 
   const toggleLock = (phone: string) => { const newUsers = allUsers.map(u => u.phone === phone ? { ...u, isLocked: !u.isLocked } : u); setAllUsers(newUsers); };
@@ -272,19 +321,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   
   // CRUD Functions...
   const handleCreatePackage = () => { 
-      if (!newPackage.name || !newPackage.price || !newPackage.image) return alert("Vui lòng điền đủ thông tin & ảnh"); 
-      const pkg: PackageItem = { id: Date.now().toString(), name: newPackage.name, price: parseInt(newPackage.price.toString()), image: newPackage.image }; 
+      if (!newPackage.name || !newPackage.price) return alert("Vui lòng nhập tên và giá tiền"); 
+      const pkg: PackageItem = { 
+          id: Date.now().toString(), 
+          name: newPackage.name, 
+          price: parseInt(newPackage.price.toString()), 
+          image: newPackage.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300',
+          description: newPackage.description 
+      }; 
       setPackages([...packages, pkg]); 
-      setNewPackage({ name: '', price: '', image: '' }); 
+      setNewPackage({ name: '', price: '', image: '', description: '' }); 
       alert("Thêm gói tập thành công"); 
   };
   const handleDeletePackage = (id: string) => { if(window.confirm("Xóa gói này?")) { setPackages(packages.filter(p => p.id !== id)); } };
   
   const handleCreatePTPackage = () => { 
-      if (!newPTPackage.name || !newPTPackage.price || !newPTPackage.sessions || !newPTPackage.image) return alert("Vui lòng điền đủ thông tin & ảnh"); 
-      const pkg: PTPackage = { id: Date.now().toString(), name: newPTPackage.name, price: parseInt(newPTPackage.price.toString()), sessions: parseInt(newPTPackage.sessions.toString()), image: newPTPackage.image }; 
+      if (!newPTPackage.name || !newPTPackage.price || !newPTPackage.sessions) return alert("Vui lòng nhập tên, giá và số buổi"); 
+      const pkg: PTPackage = { 
+          id: Date.now().toString(), 
+          name: newPTPackage.name, 
+          price: parseInt(newPTPackage.price.toString()), 
+          sessions: parseInt(newPTPackage.sessions.toString()), 
+          image: newPTPackage.image || 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&q=80&w=300',
+          description: newPTPackage.description
+      }; 
       setPTPackages([...ptPackages, pkg]); 
-      setNewPTPackage({ name: '', price: '', sessions: '', image: '' }); 
+      setNewPTPackage({ name: '', price: '', sessions: '', image: '', description: '' }); 
       alert("Thêm gói PT thành công"); 
   };
   const handleDeletePTPackage = (id: string) => { if(window.confirm("Xóa gói PT này?")) { setPTPackages(ptPackages.filter(p => p.id !== id)); } };
@@ -346,7 +408,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           case 'manage_app_interface': return () => setShowPopup('config_hero');
           case 'manage_bookings': return () => setShowPopup('pending_approvals');
           case 'view_schedule': return () => setShowPopup('view_schedule');
-          case 'view_revenue': return () => setShowPopup('revenue_report'); // Added click handler for revenue
+          case 'view_revenue': return () => setShowPopup('revenue_report');
           case 'manage_promo': return () => setShowPopup('create_promo');
           case 'manage_voucher': return () => setShowPopup('create_voucher');
           default: return () => {};
@@ -387,11 +449,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         
         <div className="flex gap-2">
            {currentAdmin?.role === 'super_admin' && (
-              <button onClick={() => setShowPopup('manage_admins')} className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center transition-all border border-blue-100 hover:bg-blue-100">
+              <button onClick={() => setShowPopup('manage_admins')} className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center transition-all border border-blue-100 hover:bg-blue-100 active:scale-95">
                 <ShieldAlert className="w-5 h-5" />
               </button>
            )}
-           <button onClick={onLogout} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center transition-all border border-red-100 hover:bg-red-100">
+           <button onClick={onLogout} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center transition-all border border-red-100 hover:bg-red-100 active:scale-95">
              <LogOut className="w-5 h-5" />
            </button>
         </div>
@@ -426,15 +488,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* Admin Notification Popup (Clickable Toast) */}
-      {currentAdmin?.settings.showPopupNoti && (pendingUsers.length > 0 || pendingPTUsers.length > 0 || pendingBookings.length > 0 || pendingPreserveUsers.length > 0) && (
+      {/* Admin Notification Popup (Clickable Toast - Auto Hide) */}
+      {currentAdmin?.settings.showPopupNoti && showAdminToast && (totalPendingApprovals > 0) && (
          <div 
             onClick={() => setShowPopup('pending_approvals')}
             className="fixed top-24 right-6 z-[90] bg-white rounded-2xl shadow-2xl p-4 w-64 border-l-4 border-[#FF6B00] animate-in slide-in-from-right-10 cursor-pointer hover:bg-orange-50 transition-colors"
          >
             <div className="flex justify-between items-start mb-2">
                <h4 className="text-gray-800 font-black text-xs uppercase flex items-center gap-1"><Bell className="w-3 h-3 text-red-500 animate-pulse"/> Cần Duyệt Gấp</h4>
-               <button onClick={(e) => { e.stopPropagation(); togglePopupNotiSetting(); }} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3"/></button>
+               <button onClick={(e) => { e.stopPropagation(); setShowAdminToast(false); }} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3"/></button>
             </div>
             <div className="space-y-1">
                 {pendingUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingUsers.length} gói tập Gym mới</p>}
@@ -442,18 +504,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {pendingBookings.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingBookings.length} lịch đặt PT</p>}
                 {pendingPreserveUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingPreserveUsers.length} yêu cầu bảo lưu</p>}
             </div>
-            <p className="text-[9px] text-blue-500 font-bold mt-2 text-right">Nhấn để xem chi tiết →</p>
+            
+            {/* Countdown bar visual */}
+            <div className="absolute bottom-0 left-0 h-1 bg-orange-100 w-full">
+                <div className="h-full bg-orange-400 animate-[shrink_6s_linear_forwards] origin-left"></div>
+            </div>
+            <style>{`@keyframes shrink { from { width: 100%; } to { width: 0%; } }`}</style>
          </div>
       )}
 
       <main className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         
-        {/* Stats Grid - Glassmorphism Updated */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Revenue Widget */}
           <div 
              onClick={() => hasPermission('view_revenue') && setShowPopup('revenue_report')}
-             className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all hover:shadow-md ${hasPermission('view_revenue') ? 'cursor-pointer group hover:border-green-200' : ''}`}
+             className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all hover:shadow-md active:scale-95 ${hasPermission('view_revenue') ? 'cursor-pointer group hover:border-green-200' : ''}`}
           >
                <div className="w-10 h-10 bg-green-100 text-green-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <TrendingUp className="w-5 h-5" />
@@ -467,7 +534,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Support Widget */}
           <div 
             onClick={() => hasPermission('chat_user') && setShowPopup('support_list')}
-            className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all hover:shadow-md ${hasPermission('chat_user') ? 'cursor-pointer hover:border-orange-200 group' : 'opacity-50'}`}
+            className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all hover:shadow-md active:scale-95 ${hasPermission('chat_user') ? 'cursor-pointer hover:border-orange-200 group' : 'opacity-50'}`}
           >
              <div className="relative w-10 h-10 bg-orange-100 text-orange-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <MessageSquare className="w-5 h-5" />
@@ -480,7 +547,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Users Widget */}
           <div 
                onClick={() => hasPermission('view_users') && userListRef.current?.scrollIntoView({behavior:'smooth'})}
-               className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all hover:shadow-md ${hasPermission('view_users') ? 'cursor-pointer hover:border-blue-200 group' : ''}`}
+               className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all hover:shadow-md active:scale-95 ${hasPermission('view_users') ? 'cursor-pointer hover:border-blue-200 group' : ''}`}
           >
                <div className="w-10 h-10 bg-blue-100 text-blue-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Users className="w-5 h-5" />
@@ -508,7 +575,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
 
-        {/* --- MENU ADMIN GRID (RESTORED) --- */}
+        {/* --- MENU ADMIN GRID --- */}
         <div>
            <h3 className="text-gray-800 font-black text-sm uppercase italic mb-4 flex items-center gap-2">
              <LayoutDashboard className="w-4 h-4 text-[#FF6B00]" />
@@ -517,7 +584,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <button 
                 onClick={() => hasPermission('view_schedule') && setShowPopup('view_schedule')} 
-                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('view_schedule') ? 'hover:shadow-lg hover:border-orange-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('view_schedule') ? 'hover:shadow-lg hover:border-orange-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="w-14 h-14 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center"><CalendarCheck className="w-7 h-7" /></div>
                  <span className="text-xs font-black text-gray-600 uppercase">Xem Lịch (Gym+PT)</span>
@@ -525,7 +592,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button 
                 onClick={() => hasPermission('approve_users') && setShowPopup('pending_approvals')} 
-                className={`relative bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('approve_users') ? 'hover:shadow-lg hover:border-red-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`relative bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('approve_users') ? 'hover:shadow-lg hover:border-red-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="relative">
                     <div className="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center"><Check className="w-7 h-7" /></div>
@@ -536,7 +603,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               
               <button 
                 onClick={() => hasPermission('manage_packages') && setShowPopup('packages')} 
-                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('manage_packages') ? 'hover:shadow-lg hover:border-purple-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('manage_packages') ? 'hover:shadow-lg hover:border-purple-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="w-14 h-14 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center"><Package className="w-7 h-7" /></div>
                  <span className="text-xs font-black text-gray-600 uppercase">Quản Lý Gói Gym</span>
@@ -544,7 +611,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               
               <button 
                 onClick={() => hasPermission('manage_pt_packages') && setShowPopup('pt_packages')} 
-                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('manage_pt_packages') ? 'hover:shadow-lg hover:border-pink-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('manage_pt_packages') ? 'hover:shadow-lg hover:border-pink-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="w-14 h-14 bg-pink-50 text-pink-500 rounded-full flex items-center justify-center"><Dumbbell className="w-7 h-7" /></div>
                  <span className="text-xs font-black text-gray-600 uppercase">Quản Lý Gói PT</span>
@@ -552,7 +619,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button 
                 onClick={() => hasPermission('add_pt') && setShowPopup('add_pt')} 
-                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('add_pt') ? 'hover:shadow-lg hover:border-green-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('add_pt') ? 'hover:shadow-lg hover:border-green-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="w-14 h-14 bg-green-50 text-green-500 rounded-full flex items-center justify-center"><UserPlus className="w-7 h-7" /></div>
                  <span className="text-xs font-black text-gray-600 uppercase">Thêm HLV Mới</span>
@@ -560,7 +627,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button 
                 onClick={() => hasPermission('manage_promo') && setShowPopup('create_promo')} 
-                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('manage_promo') ? 'hover:shadow-lg hover:border-yellow-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('manage_promo') ? 'hover:shadow-lg hover:border-yellow-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="w-14 h-14 bg-yellow-50 text-yellow-500 rounded-full flex items-center justify-center"><ImageIcon className="w-7 h-7" /></div>
                  <span className="text-xs font-black text-gray-600 uppercase">Thêm Khuyến Mãi</span>
@@ -568,7 +635,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button 
                 onClick={() => hasPermission('manage_voucher') && setShowPopup('create_voucher')} 
-                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('manage_voucher') ? 'hover:shadow-lg hover:border-teal-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('manage_voucher') ? 'hover:shadow-lg hover:border-teal-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="w-14 h-14 bg-teal-50 text-teal-500 rounded-full flex items-center justify-center"><Ticket className="w-7 h-7" /></div>
                  <span className="text-xs font-black text-gray-600 uppercase">Tạo Voucher</span>
@@ -576,7 +643,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button 
                 onClick={() => hasPermission('send_notification') && setShowPopup('broadcast')} 
-                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('send_notification') ? 'hover:shadow-lg hover:border-red-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('send_notification') ? 'hover:shadow-lg hover:border-red-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center"><Megaphone className="w-7 h-7" /></div>
                  <span className="text-xs font-black text-gray-600 uppercase">Gửi Thông Báo</span>
@@ -584,7 +651,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <button 
                 onClick={() => hasPermission('manage_app_interface') && setShowPopup('config_hero')} 
-                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm ${hasPermission('manage_app_interface') ? 'hover:shadow-lg hover:border-purple-100' : 'opacity-50 cursor-not-allowed'}`}
+                className={`bg-white p-6 rounded-[32px] flex flex-col items-center justify-center gap-3 transition-all border border-transparent shadow-sm active:scale-95 ${hasPermission('manage_app_interface') ? 'hover:shadow-lg hover:border-purple-100' : 'opacity-50 cursor-not-allowed'}`}
               >
                  <div className="w-14 h-14 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center"><ImageIcon2 className="w-7 h-7" /></div>
                  <span className="text-xs font-black text-gray-600 uppercase">Cấu Hình Banner</span>
@@ -621,7 +688,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <div key={user.phone} className={`p-5 flex items-center justify-between hover:bg-orange-50 transition-colors ${user.isLocked ? 'opacity-50 grayscale' : ''}`}>
                             <div className="flex items-center gap-4">
                                <div className="w-12 h-12 rounded-2xl bg-gray-200 overflow-hidden border border-gray-100 shadow-sm">
-                                  {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="avt" /> : <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${user.phone}`} alt="avt" />}
+                                  {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="avt" /> : <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${user.phone}`} className="w-full h-full object-cover" alt="avt" />}
                                </div>
                                <div>
                                   <div className="flex items-center gap-2">
@@ -648,7 +715,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
                             
                             <div className="flex items-center gap-2">
-                               <button onClick={() => { setSelectedUserPhone(user.phone); setShowPopup('user_settings'); }} className="p-3 bg-white border border-gray-100 text-gray-400 rounded-xl hover:text-white hover:bg-orange-500 hover:border-orange-500 transition-all shadow-sm"><Settings className="w-4 h-4" /></button>
+                               <button onClick={() => { setSelectedUserPhone(user.phone); setShowPopup('user_settings'); }} className="p-3 bg-white border border-gray-100 text-gray-400 rounded-xl hover:text-white hover:bg-orange-500 hover:border-orange-500 transition-all shadow-sm active:scale-95"><Settings className="w-4 h-4" /></button>
                             </div>
                           </div>
                         ))
@@ -663,7 +730,146 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* --- POPUPS --- */}
       
-      {/* 1. PENDING APPROVALS LIST (NEW MODAL FOR QUICK APPROVE) */}
+      {/* 9. BANNER CONFIG */}
+      {showPopup === 'config_hero' && (
+         <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowPopup(null)} />
+            <div className="relative w-full max-w-[400px] bg-white rounded-[40px] p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+               <h3 className="text-gray-800 font-black text-xl italic uppercase mb-2 flex items-center gap-2"><ImageIcon2 className="w-6 h-6 text-purple-500" /> Cấu hình Banner Home</h3>
+               <p className="text-xs text-gray-400 font-bold mb-4">Thay đổi ảnh nền và chữ chính của trang chủ người dùng.</p>
+               
+               <div className="space-y-3 mb-4">
+                  <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase ml-1 block">Tiêu đề chính</label>
+                      <textarea 
+                          value={configHero.title} 
+                          onChange={e => setConfigHero({...configHero, title: e.target.value})}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold outline-none resize-none"
+                          rows={2}
+                          placeholder="Nhập tiêu đề..."
+                      />
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase ml-1 block">Phụ đề (Tagline)</label>
+                      <input 
+                          value={configHero.subtitle} 
+                          onChange={e => setConfigHero({...configHero, subtitle: e.target.value})}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold outline-none"
+                          placeholder="Nhập phụ đề..."
+                      />
+                  </div>
+               </div>
+
+               <div className="mb-6 flex justify-center">
+                  <ImageUpload 
+                     currentImage={configHero.image} 
+                     onImageUploaded={(url) => setConfigHero({...configHero, image: url})}
+                     label="Ảnh Banner Hiện Tại"
+                     aspect="aspect-square" 
+                     className="w-48 h-48"
+                  />
+               </div>
+
+               <div className="flex gap-2">
+                   <button onClick={() => setShowPopup(null)} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold uppercase text-xs hover:bg-gray-200 active:scale-95 transition-all">Hủy</button>
+                   <button onClick={handleSaveAppConfig} className="flex-1 bg-purple-500 text-white py-3 rounded-xl font-bold uppercase text-xs hover:bg-purple-600 shadow-lg shadow-purple-200 active:scale-95 transition-all">Lưu Giao Diện</button>
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* 12. USER SETTINGS MODAL (FIXED & IMPROVED) */}
+      {showPopup === 'user_settings' && selectedUser && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowPopup(null)} />
+          <div className="relative w-full max-w-[400px] bg-white rounded-[40px] p-6 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+             <div className="flex items-center gap-4 mb-6">
+                <div className="w-14 h-14 rounded-2xl bg-gray-100 overflow-hidden border border-gray-200 shrink-0">
+                    <img src={selectedUser.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${selectedUser.phone}`} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <h3 className="text-gray-800 font-black text-lg italic uppercase leading-none">{selectedUser.realName || selectedUser.name}</h3>
+                  <p className="text-gray-400 text-xs font-bold mt-1">{selectedUser.phone}</p>
+                </div>
+                <button onClick={() => setShowPopup(null)} className="ml-auto p-2 bg-gray-100 rounded-full text-gray-400 hover:bg-gray-200"><X className="w-5 h-5" /></button>
+             </div>
+
+             <div className="space-y-4">
+                {/* Unified Editing Form */}
+                {hasPermission('edit_user_settings') && (
+                   <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl space-y-4">
+                      <h4 className="text-xs font-black text-gray-500 uppercase flex items-center gap-2"><Pencil className="w-3 h-3"/> Chỉnh Sửa Thông Tin</h4>
+                      
+                      {/* Name Edit */}
+                      <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-1 block">Tên thật (Quản lý)</label>
+                          <input 
+                              value={editingRealName} 
+                              onChange={(e) => setEditingRealName(e.target.value)} 
+                              className="bg-white rounded-xl px-3 py-3 text-gray-800 font-bold text-sm w-full outline-none border border-gray-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-200" 
+                              placeholder="Nhập tên thật..." 
+                          />
+                      </div>
+
+                      {/* Avatar Edit */}
+                      <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-1 block">Ảnh đại diện</label>
+                          <ImageUpload 
+                              currentImage={editingUserAvatar} 
+                              onImageUploaded={setEditingUserAvatar} 
+                              label=""
+                              aspect="aspect-square"
+                              className="w-32 mx-auto"
+                          />
+                      </div>
+                   </div>
+                )}
+
+                {/* Actions Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                   {hasPermission('manage_user') && (
+                      <button onClick={() => toggleLock(selectedUser.phone)} className={`${selectedUser.isLocked ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'} text-white p-4 rounded-2xl font-black text-xs uppercase shadow-lg transition-transform active:scale-95`}>
+                         {selectedUser.isLocked ? 'Mở Khóa' : 'Tạm Khóa'}
+                      </button>
+                   )}
+                   {hasPermission('chat_user') && (
+                      <button onClick={() => setShowPopup('chat')} className="bg-gray-800 hover:bg-gray-700 p-4 rounded-2xl text-white font-black text-xs uppercase shadow-lg transition-transform active:scale-95">
+                         Chat User
+                      </button>
+                   )}
+                   {hasPermission('manage_user') && (
+                      <button onClick={handleDeleteUser} className="bg-white text-red-500 hover:bg-red-50 p-4 rounded-2xl font-black text-xs uppercase col-span-2 border border-red-100 transition-colors active:scale-95">
+                         Xóa Vĩnh Viễn User
+                      </button>
+                   )}
+                </div>
+
+                {/* Gift Days */}
+                {hasPermission('manage_user') && (
+                   <div className="bg-white p-4 rounded-2xl border border-gray-200">
+                      <p className="text-[10px] font-black text-gray-500 uppercase mb-2">Tặng ngày tập</p>
+                      <div className="flex gap-2">
+                         <input type="number" value={giftDays} onChange={(e) => setGiftDays(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-xl px-4 text-gray-800 font-bold w-full outline-none" placeholder="Số ngày..." />
+                         <button onClick={handleGiftDays} className="bg-green-500 text-white rounded-xl px-4 py-2 font-black text-xs uppercase shadow-md shadow-green-200 whitespace-nowrap active:scale-95 transition-transform">Tặng Ngay</button>
+                      </div>
+                   </div>
+                )}
+
+                {/* Main SAVE Button */}
+                {hasPermission('edit_user_settings') && (
+                    <button 
+                        onClick={handleSaveUserDetails}
+                        className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-sm uppercase shadow-xl shadow-orange-200 mt-4 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                    >
+                        <Save className="w-5 h-5" /> Lưu Thay Đổi
+                    </button>
+                )}
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 1. PENDING APPROVALS LIST */}
       {showPopup === 'pending_approvals' && (
          <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowPopup(null)} />
@@ -690,7 +896,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                            <p className="font-bold text-sm text-gray-800">{u.realName || u.name} - {u.phone}</p>
                                            <p className="text-xs text-gray-600">Gói: {u.subscription?.name} ({u.subscription?.months} tháng) - <span className="font-black text-green-600">{(u.subscription?.paidAmount || u.subscription?.price || 0).toLocaleString()}đ</span></p>
                                        </div>
-                                       <button onClick={() => handleApprove(u.phone)} className="bg-green-500 text-white p-2 rounded-xl text-xs font-black shadow-md hover:bg-green-600">DUYỆT</button>
+                                       <button onClick={() => handleApprove(u.phone)} className="bg-green-500 text-white p-2 rounded-xl text-xs font-black shadow-md hover:bg-green-600 active:scale-95">DUYỆT</button>
                                    </div>
                                ))}
                            </div>
@@ -706,7 +912,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                            <p className="font-bold text-sm text-gray-800">{u.realName || u.name} - {u.phone}</p>
                                            <p className="text-xs text-gray-600">Gói PT: {u.ptSubscription?.name} - <span className="font-black text-green-600">{(u.ptSubscription?.paidAmount || u.ptSubscription?.price || 0).toLocaleString()}đ</span></p>
                                        </div>
-                                       <button onClick={() => handleApprovePT(u.phone)} className="bg-green-500 text-white p-2 rounded-xl text-xs font-black shadow-md hover:bg-green-600">DUYỆT</button>
+                                       <button onClick={() => handleApprovePT(u.phone)} className="bg-green-500 text-white p-2 rounded-xl text-xs font-black shadow-md hover:bg-green-600 active:scale-95">DUYỆT</button>
                                    </div>
                                ))}
                            </div>
@@ -723,8 +929,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                            <p className="text-xs text-gray-600">{b.date} lúc {b.timeSlot}</p>
                                        </div>
                                        <div className="flex gap-2">
-                                           <button onClick={() => handleBookingAction(b.id, 'reject')} className="bg-white border border-red-200 text-red-500 p-2 rounded-xl text-xs font-black hover:bg-red-50">TỪ CHỐI</button>
-                                           <button onClick={() => handleBookingAction(b.id, 'approve')} className="bg-green-500 text-white p-2 rounded-xl text-xs font-black shadow-md hover:bg-green-600">DUYỆT</button>
+                                           <button onClick={() => handleBookingAction(b.id, 'reject')} className="bg-white border border-red-200 text-red-500 p-2 rounded-xl text-xs font-black hover:bg-red-50 active:scale-95">TỪ CHỐI</button>
+                                           <button onClick={() => handleBookingAction(b.id, 'approve')} className="bg-green-500 text-white p-2 rounded-xl text-xs font-black shadow-md hover:bg-green-600 active:scale-95">DUYỆT</button>
                                        </div>
                                    </div>
                                ))}
@@ -741,7 +947,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                            <p className="font-bold text-sm text-gray-800">{u.realName || u.name} - {u.phone}</p>
                                            <p className="text-xs text-gray-500">Gói hiện tại: {u.subscription?.name}</p>
                                        </div>
-                                       <button onClick={() => handleApprovePreservation(u.phone)} className="bg-orange-500 text-white p-2 rounded-xl text-xs font-black shadow-md hover:bg-orange-600">DUYỆT</button>
+                                       <button onClick={() => handleApprovePreservation(u.phone)} className="bg-orange-500 text-white p-2 rounded-xl text-xs font-black shadow-md hover:bg-orange-600 active:scale-95">DUYỆT</button>
                                    </div>
                                ))}
                            </div>
@@ -752,7 +958,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
          </div>
       )}
 
-      {/* 2. VIEW SCHEDULE (Gym + PT Combined View) */}
+      {/* 2. VIEW SCHEDULE */}
       {showPopup === 'view_schedule' && (
          <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowPopup(null)} />
@@ -816,7 +1022,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
          </div>
       )}
 
-      {/* 3. CREATE PROMO (Fix: Image Upload) */}
+      {/* 3. CREATE PROMO */}
       {showPopup === 'create_promo' && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowPopup(null)} />
@@ -824,12 +1030,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                <h3 className="font-black text-gray-800 uppercase italic mb-4">Thêm Khuyến Mãi</h3>
                <input className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 mb-3 font-bold text-sm outline-none" placeholder="Tiêu đề khuyến mãi" value={newPromo.title} onChange={e => setNewPromo({...newPromo, title: e.target.value})} />
                <div className="mb-4"><ImageUpload currentImage={newPromo.image} onImageUploaded={url => setNewPromo({...newPromo, image: url})} label="Ảnh khuyến mãi (Ngang)" aspect="aspect-video" /></div>
-               <button onClick={handleCreatePromo} className="w-full bg-blue-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg">Tạo Khuyến Mãi</button>
+               <button onClick={handleCreatePromo} className="w-full bg-blue-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg active:scale-95 transition-all">Tạo Khuyến Mãi</button>
             </div>
           </div>
       )}
 
-      {/* 4. CREATE VOUCHER (Fix: Image Upload) */}
+      {/* 4. CREATE VOUCHER */}
       {showPopup === 'create_voucher' && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowPopup(null)} />
@@ -844,7 +1050,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    <input type="number" className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none" placeholder="Giá trị (0.1 = 10%)" value={newVoucher.value} onChange={e => setNewVoucher({...newVoucher, value: parseFloat(e.target.value)})} />
                </div>
                <div className="mb-4"><ImageUpload currentImage={newVoucher.image} onImageUploaded={url => setNewVoucher({...newVoucher, image: url})} label="Ảnh Voucher (Tùy chọn)" aspect="h-48" /></div>
-               <button onClick={handleCreateVoucher} className="w-full bg-teal-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg">Tạo Voucher</button>
+               <button onClick={handleCreateVoucher} className="w-full bg-teal-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg active:scale-95 transition-all">Tạo Voucher</button>
             </div>
           </div>
       )}
@@ -856,7 +1062,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="relative w-full max-w-sm bg-white rounded-[32px] p-6 shadow-2xl">
                <h3 className="font-black text-gray-800 uppercase italic mb-4">Gửi Thông Báo</h3>
                <textarea className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 mb-4 font-bold text-sm outline-none h-32 resize-none" placeholder="Nội dung thông báo..." value={broadcastMsg} onChange={e => setBroadcastMsg(e.target.value)} />
-               <button onClick={handleBroadcast} className="w-full bg-red-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg">Gửi Cho Tất Cả ({allUsers.length})</button>
+               <button onClick={handleBroadcast} className="w-full bg-red-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg active:scale-95 transition-all">Gửi Cho Tất Cả ({allUsers.length})</button>
             </div>
           </div>
       )}
@@ -880,8 +1086,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    <h4 className="text-xs font-bold uppercase text-gray-400 mb-2">Thêm gói mới</h4>
                    <input className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 mb-2 text-sm font-bold outline-none" placeholder="Tên gói" value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} />
                    <input className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 mb-2 text-sm font-bold outline-none" type="number" placeholder="Giá tiền" value={newPackage.price} onChange={e => setNewPackage({...newPackage, price: e.target.value})} />
-                   <div className="mb-2"><ImageUpload currentImage={newPackage.image} onImageUploaded={url => setNewPackage({...newPackage, image: url})} label="Ảnh gói tập" aspect="h-48" /></div>
-                   <button onClick={handleCreatePackage} className="w-full bg-purple-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg">Thêm Gói</button>
+                   <input className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 mb-2 text-sm font-bold outline-none" placeholder="Mô tả / Ghi chú" value={newPackage.description} onChange={e => setNewPackage({...newPackage, description: e.target.value})} />
+                   <div className="mb-2"><ImageUpload currentImage={newPackage.image} onImageUploaded={url => setNewPackage({...newPackage, image: url})} label="Ảnh gói tập (Không bắt buộc)" aspect="h-48" /></div>
+                   <button onClick={handleCreatePackage} className="w-full bg-purple-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg active:scale-95 transition-all">Thêm Gói</button>
                </div>
             </div>
           </div>
@@ -909,8 +1116,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        <input className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold outline-none" type="number" placeholder="Giá tiền" value={newPTPackage.price} onChange={e => setNewPTPackage({...newPTPackage, price: e.target.value})} />
                        <input className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold outline-none" type="number" placeholder="Số buổi" value={newPTPackage.sessions} onChange={e => setNewPTPackage({...newPTPackage, sessions: e.target.value})} />
                    </div>
-                   <div className="mb-2"><ImageUpload currentImage={newPTPackage.image} onImageUploaded={url => setNewPTPackage({...newPTPackage, image: url})} label="Ảnh gói PT" aspect="h-48" /></div>
-                   <button onClick={handleCreatePTPackage} className="w-full bg-pink-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg">Thêm Gói PT</button>
+                   <input className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 mb-2 text-sm font-bold outline-none" placeholder="Mô tả / Ghi chú" value={newPTPackage.description} onChange={e => setNewPTPackage({...newPTPackage, description: e.target.value})} />
+                   <div className="mb-2"><ImageUpload currentImage={newPTPackage.image} onImageUploaded={url => setNewPTPackage({...newPTPackage, image: url})} label="Ảnh gói PT (Không bắt buộc)" aspect="h-48" /></div>
+                   <button onClick={handleCreatePTPackage} className="w-full bg-pink-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg active:scale-95 transition-all">Thêm Gói PT</button>
                </div>
             </div>
           </div>
@@ -925,35 +1133,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                <input className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 mb-2 font-bold text-sm outline-none" placeholder="Tên HLV" value={newPT.name} onChange={e => setNewPT({...newPT, name: e.target.value})} />
                <input className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 mb-2 font-bold text-sm outline-none" placeholder="Chuyên môn (VD: Cardio, Muscle)" value={newPT.specialty} onChange={e => setNewPT({...newPT, specialty: e.target.value})} />
                <div className="mb-4"><ImageUpload currentImage={newPT.image} onImageUploaded={url => setNewPT({...newPT, image: url})} label="Ảnh HLV (Vuông)" aspect="aspect-square" /></div>
-               <button onClick={handleCreatePT} className="w-full bg-green-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg">Thêm HLV</button>
+               <button onClick={handleCreatePT} className="w-full bg-green-500 text-white py-3 rounded-xl font-bold uppercase text-xs shadow-lg active:scale-95 transition-all">Thêm HLV</button>
             </div>
           </div>
-      )}
-
-      {/* 9. BANNER CONFIG */}
-      {showPopup === 'config_hero' && (
-         <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowPopup(null)} />
-            <div className="relative w-full max-w-[400px] bg-white rounded-[40px] p-8 shadow-2xl">
-               <h3 className="text-gray-800 font-black text-xl italic uppercase mb-2 flex items-center gap-2"><ImageIcon2 className="w-6 h-6 text-purple-500" /> Cấu hình Banner Home</h3>
-               <p className="text-xs text-gray-400 font-bold mb-4">Thay đổi ảnh nền chính của trang chủ người dùng.</p>
-               
-               <div className="mb-4">
-                  <ImageUpload 
-                     currentImage={newHeroImage || heroImage} 
-                     onImageUploaded={setNewHeroImage} 
-                     label="Ảnh Banner Hiện Tại (Full Vuông)"
-                     aspect="aspect-square" 
-                     className="h-64"
-                  />
-               </div>
-
-               <div className="flex gap-2">
-                   <button onClick={() => setShowPopup(null)} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold uppercase text-xs hover:bg-gray-200">Hủy</button>
-                   <button onClick={handleSaveHeroImage} className="flex-1 bg-purple-500 text-white py-3 rounded-xl font-bold uppercase text-xs hover:bg-purple-600 shadow-lg shadow-purple-200">Lưu Thay Đổi</button>
-               </div>
-            </div>
-         </div>
       )}
       
       {/* 10. REVENUE REPORT */}
@@ -982,7 +1164,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                </div>
 
-               <button onClick={() => setShowPopup(null)} className="mt-6 w-full bg-gray-100 text-gray-500 py-3 rounded-xl font-bold uppercase text-xs hover:bg-gray-200">Đóng</button>
+               <button onClick={() => setShowPopup(null)} className="mt-6 w-full bg-gray-100 text-gray-500 py-3 rounded-xl font-bold uppercase text-xs hover:bg-gray-200 active:scale-95 transition-all">Đóng</button>
             </div>
          </div>
       )}
@@ -1024,68 +1206,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
          </div>
       )}
 
-      {/* 12. USER SETTINGS MODAL (Fixed State) */}
-      {showPopup === 'user_settings' && selectedUser && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={() => setShowPopup(null)} />
-          <div className="relative w-full max-w-[400px] bg-white rounded-[40px] p-6 shadow-2xl">
-             <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 rounded-2xl bg-gray-100 overflow-hidden border border-gray-200">
-                    <img src={selectedUser.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${selectedUser.phone}`} className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <h3 className="text-gray-800 font-black text-lg italic uppercase">{selectedUser.realName || selectedUser.name}</h3>
-                  <p className="text-gray-400 text-xs font-bold">{selectedUser.phone}</p>
-                </div>
-                <button onClick={() => setShowPopup(null)} className="ml-auto p-2 bg-gray-100 rounded-full text-gray-400 hover:bg-gray-200"><X className="w-5 h-5" /></button>
-             </div>
-
-             <div className="space-y-4">
-                {/* Rename Real Name */}
-                {hasPermission('edit_user_settings') && (
-                   <div className="bg-gray-50 border border-gray-100 p-3 rounded-2xl">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-1 block">Tên thật (Admin quản lý)</label>
-                      <div className="flex gap-2">
-                          <input value={editingRealName} onChange={(e) => setEditingRealName(e.target.value)} className="bg-white rounded-xl px-3 py-2 text-gray-800 font-bold text-sm w-full outline-none border border-gray-200 focus:border-orange-500" placeholder="Nhập tên thật..." />
-                          <button onClick={saveRealName} className="bg-blue-500 text-white rounded-xl px-3 font-bold shadow-md"><Pencil className="w-4 h-4" /></button>
-                      </div>
-                   </div>
-                )}
-
-                {/* Actions Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                   {hasPermission('manage_user') && (
-                      <button onClick={() => toggleLock(selectedUser.phone)} className={`${selectedUser.isLocked ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'} text-white p-4 rounded-2xl font-black text-xs uppercase shadow-lg`}>
-                         {selectedUser.isLocked ? 'Mở Khóa' : 'Tạm Khóa'}
-                      </button>
-                   )}
-                   {hasPermission('chat_user') && (
-                      <button onClick={() => setShowPopup('chat')} className="bg-gray-800 hover:bg-gray-700 p-4 rounded-2xl text-white font-black text-xs uppercase col-span-1 shadow-lg">
-                         Chat User
-                      </button>
-                   )}
-                   {hasPermission('manage_user') && (
-                      <button onClick={handleDeleteUser} className="bg-red-50 text-red-500 hover:bg-red-100 p-4 rounded-2xl font-black text-xs uppercase col-span-2 border border-red-100">
-                         Xóa Vĩnh Viễn User
-                      </button>
-                   )}
-                </div>
-
-                {/* Gift Days */}
-                {hasPermission('manage_user') && (
-                   <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                      <p className="text-[10px] font-black text-gray-500 uppercase mb-2">Tặng ngày tập</p>
-                      <div className="flex gap-2">
-                         <input type="number" value={giftDays} onChange={(e) => setGiftDays(e.target.value)} className="bg-white border border-gray-200 rounded-xl px-4 text-gray-800 font-bold w-full outline-none" placeholder="Số ngày..." />
-                         <button onClick={handleGiftDays} className="bg-green-500 text-white rounded-xl px-4 py-2 font-black text-xs uppercase shadow-md shadow-green-200">Tặng</button>
-                      </div>
-                   </div>
-                )}
-             </div>
-          </div>
-        </div>
-      )}
-
       {/* (Chat Popup) */}
       {showPopup === 'chat' && selectedUser && hasPermission('chat_user') && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center px-4 animate-in fade-in duration-300">
@@ -1113,7 +1233,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="flex-1 bg-gray-100 rounded-full px-4 text-gray-800 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-200" 
                   placeholder="Nhập tin nhắn..." 
                  />
-                 <button onClick={sendAdminMessage} className="p-3 bg-blue-500 hover:bg-blue-600 rounded-full text-white shadow-lg shadow-blue-200"><Send className="w-4 h-4" /></button>
+                 <button onClick={sendAdminMessage} className="p-3 bg-blue-500 hover:bg-blue-600 rounded-full text-white shadow-lg shadow-blue-200 active:scale-95 transition-transform"><Send className="w-4 h-4" /></button>
               </div>
            </div>
         </div>
@@ -1149,7 +1269,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                      ))}
                   </div>
-                  <button onClick={handleCreateAdmin} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl uppercase text-xs shadow-md shadow-blue-200">Tạo Admin</button>
+                  <button onClick={handleCreateAdmin} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl uppercase text-xs shadow-md shadow-blue-200 active:scale-95 transition-all">Tạo Admin</button>
                </div>
 
                {/* List Admins */}
@@ -1166,7 +1286,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               if(window.confirm('Xóa admin này?')) {
                                  setAdmins(admins.filter(a => a.username !== admin.username));
                               }
-                           }} className="text-red-500 p-2 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                           }} className="text-red-500 p-2 hover:bg-red-50 rounded-lg active:scale-95"><Trash2 className="w-4 h-4"/></button>
                         )}
                      </div>
                   ))}
