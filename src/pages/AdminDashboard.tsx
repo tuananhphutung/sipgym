@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserProfile, Promotion, Trainer, TrainingProgram, VoucherItem, PackageItem, PTPackage, AdminProfile, AdminPermission, Booking } from '../App';
@@ -9,7 +8,7 @@ import {
   Calendar, Settings, Search, Send, ArrowRight,
   Megaphone, UserPlus, ListFilter, Package, PauseCircle, Trash2, Dumbbell,
   UserCheck, Menu, Eye, ShieldAlert, BadgeCheck, Pencil, CreditCard, Image as ImageIcon2, Clock,
-  CalendarCheck, AlertCircle, Save, Upload, Type, ScanFace, Phone, Edit3, ChevronRight, ChevronLeft, User as UserIcon, MoreHorizontal, Filter, CheckCircle2
+  CalendarCheck, AlertCircle, Save, Upload, Type, ScanFace, Phone, Edit3, ChevronRight, ChevronLeft, User as UserIcon, MoreHorizontal, Filter
 } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 
@@ -511,8 +510,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
      return (
         <button 
            onClick={() => { if(allowed) { action(); setIsFloatingMenuOpen(false); } }}
-           disabled={!allowed}
-           className={`relative flex items-center gap-3 p-3 w-full rounded-xl transition-all ${allowed ? 'hover:bg-orange-50 text-gray-700' : 'opacity-40 cursor-not-allowed text-gray-400 grayscale'}`}
+           className={`relative flex items-center gap-3 p-3 w-full rounded-xl transition-all ${allowed ? 'hover:bg-orange-50 text-gray-700' : 'opacity-40 cursor-not-allowed text-gray-400'}`}
         >
            <div className="relative">
               <Icon className="w-5 h-5 text-[#FF6B00]" />

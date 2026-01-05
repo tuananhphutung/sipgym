@@ -74,17 +74,17 @@ const TrainingSchedule: React.FC<TrainingScheduleProps> = ({ user, allUsers, onU
   };
 
   return (
-    <div className="min-h-screen bg-white pb-20 animate-in slide-in-from-right duration-500">
-      <div className="bg-[#00AEEF] px-6 pt-12 pb-10 rounded-b-[40px] relative overflow-hidden">
+    <div className="min-h-screen bg-white pb-20 animate-in slide-in-from-right duration-500 w-full">
+      <div className="bg-[#00AEEF] px-6 pt-12 pb-10 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-10 opacity-10"><CalIcon className="w-32 h-32 text-white" /></div>
         <button onClick={() => navigate('/')} className="mb-6 p-2 bg-white/20 rounded-full text-white"><ArrowLeft className="w-6 h-6" /></button>
         <h1 className="text-3xl font-[900] text-white italic uppercase leading-none">Lịch Tập Luyện</h1>
         <p className="text-white/70 text-sm font-bold mt-2 uppercase tracking-widest">Theo dõi lịch tập Gym & PT</p>
       </div>
 
-      <div className="px-6 -mt-6 space-y-6">
-        {/* Basic Calendar */}
-        <div className="bg-white rounded-[32px] p-6 shadow-xl shadow-blue-50 border border-gray-100">
+      <div className="w-full">
+        {/* Basic Calendar - Full Width */}
+        <div className="bg-white p-4 shadow-lg shadow-blue-50 border-b border-gray-100">
           <div className="flex justify-between items-center mb-6">
             <button onClick={() => changeMonth(-1)} className="p-2 bg-gray-50 rounded-xl text-gray-400"><ChevronLeft className="w-5 h-5" /></button>
             <h2 className="font-black text-gray-800 uppercase italic">Tháng {currentMonth.getMonth() + 1}, {currentMonth.getFullYear()}</h2>
@@ -123,7 +123,7 @@ const TrainingSchedule: React.FC<TrainingScheduleProps> = ({ user, allUsers, onU
 
         {/* PT Bookings List */}
         {bookings && bookings.length > 0 && (
-           <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100">
+           <div className="bg-white p-6 shadow-sm border-b border-gray-100">
               <h3 className="font-black text-gray-800 uppercase italic mb-4 text-sm flex items-center gap-2"><Clock className="w-4 h-4"/> Lịch Tập PT</h3>
               <div className="space-y-3">
                  {myBookings.length === 0 ? <p className="text-xs text-gray-400">Chưa có lịch đặt PT nào.</p> : myBookings.map(b => (

@@ -36,19 +36,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   
   // Selection State (Gym Only)
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<{label: string, months: number, discount: number} | null>(null);
   
   // Voucher State
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<VoucherItem | null>(null);
-
-  // Constants
-  const durations = [
-    { label: '1 tháng', months: 1, discount: 0 },
-    { label: '3 tháng', months: 3, discount: 0.1 }, 
-    { label: '6 tháng', months: 6, discount: 0.15 }, 
-    { label: '1 năm', months: 12, discount: 0.25 }   
-  ];
 
   // Logic init
   React.useEffect(() => {
@@ -62,24 +53,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   // Calculations
   const calculation = useMemo(() => {
       let basePrice = 0;
-      let months = 0;
-      let durationDiscount = 0;
 
-      if (type === 'gym' && selectedPackage && selectedDuration) {
-          basePrice = selectedPackage.price * selectedDuration.months;
-          months = selectedDuration.months;
-          durationDiscount = selectedDuration.discount;
+      if (type === 'gym' && selectedPackage) {
+          basePrice = selectedPackage.price;
       } else if (type === 'pt' && ptPackage) {
           basePrice = ptPackage.price;
-          months = 0; // PT doesn't have duration discount logic like Gym here
-          durationDiscount = 0;
       }
-
-      const priceAfterDurationDisc = basePrice * (1 - durationDiscount);
       
       // Referral Discount logic
-      const referralDiscAmount = priceAfterDurationDisc * userReferralDiscount;
-      const priceAfterReferral = priceAfterDurationDisc - referralDiscAmount;
+      const referralDiscAmount = basePrice * userReferralDiscount;
+      const priceAfterReferral = basePrice - referralDiscAmount;
 
       // Voucher Discount logic
       let voucherDiscAmount = 0;
@@ -89,8 +72,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
       const finalPrice = Math.round(priceAfterReferral - voucherDiscAmount);
 
-      return { basePrice, durationDiscount, referralDiscAmount, voucherDiscAmount, finalPrice };
-  }, [type, selectedPackage, selectedDuration, ptPackage, userReferralDiscount, appliedVoucher]);
+      return { basePrice, referralDiscAmount, voucherDiscAmount, finalPrice };
+  }, [type, selectedPackage, ptPackage, userReferralDiscount, appliedVoucher]);
 
   const handleApplyVoucher = () => {
       if (!voucherCode) return;
@@ -105,6 +88,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       }
   };
 
+  const handleSelectPackage = (pkg: PackageItem) => {
+      setSelectedPackage(pkg);
+      setStep('voucher'); // Auto advance
+  };
+
   const handlePayment = () => {
       setStep('payment');
   };
@@ -112,7 +100,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const finish = () => {
       onConfirm({
           packageName: type === 'gym' ? selectedPackage?.name : ptPackage?.name,
-          months: type === 'gym' ? selectedDuration?.months : 0,
+          months: type === 'gym' ? (selectedPackage?.duration || 1) : 0, // Use duration from Admin Package
           price: calculation.finalPrice,
           voucherCode: appliedVoucher?.code
       });
@@ -121,7 +109,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const openBankApp = (scheme: string) => {
       window.location.href = scheme;
-      // Fallback logic usually requires checking visibility change or timeout
   };
 
   const copyToClipboard = (text: string) => {
@@ -149,20 +136,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         </div>
 
         <div className="overflow-y-auto no-scrollbar p-6">
-            {/* STEP 1: SELECT (Gym Only) */}
+            {/* STEP 1: SELECT (Gym Only) - Admin Defined Packages */}
             {step === 'select' && type === 'gym' && (
                 <div className="space-y-4">
                     {packages.map((pkg) => (
                         <button
                             key={pkg.id}
-                            onClick={() => setSelectedPackage(pkg)}
-                            className={`flex flex-col gap-2 p-3 rounded-2xl border-2 w-full transition-all text-left ${selectedPackage?.id === pkg.id ? 'border-[#FF6B00] bg-orange-50' : 'border-gray-100'}`}
+                            onClick={() => handleSelectPackage(pkg)}
+                            className={`flex flex-col gap-2 p-3 rounded-2xl border-2 w-full transition-all text-left active:scale-95 ${selectedPackage?.id === pkg.id ? 'border-[#FF6B00] bg-orange-50' : 'border-gray-100 hover:border-orange-200'}`}
                         >
                             <div className="flex items-center gap-4">
                                 <img src={pkg.image} className="w-16 h-16 rounded-xl object-cover" />
                                 <div className="text-left flex-1">
                                     <p className="font-bold text-gray-800">{pkg.name}</p>
-                                    <p className="text-xs text-gray-500">{pkg.price.toLocaleString()}đ/tháng</p>
+                                    <p className="text-xs text-gray-500">{pkg.price.toLocaleString()}đ</p>
+                                    <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-md font-bold uppercase mt-1 inline-block">{pkg.duration} tháng</span>
                                 </div>
                                 {selectedPackage?.id === pkg.id && <CheckCircle2 className="w-6 h-6 text-[#FF6B00]" />}
                             </div>
@@ -171,28 +159,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                             )}
                         </button>
                     ))}
-                    
-                    {selectedPackage && (
-                        <div className="grid grid-cols-2 gap-2 mt-4">
-                            {durations.map(d => (
-                                <button
-                                    key={d.label}
-                                    onClick={() => setSelectedDuration(d)}
-                                    className={`py-3 rounded-xl font-bold border-2 text-xs flex flex-col items-center ${selectedDuration?.label === d.label ? 'border-[#FF6B00] bg-[#FF6B00] text-white' : 'border-gray-100 text-gray-500'}`}
-                                >
-                                    <span>{d.label}</span>
-                                    {d.discount > 0 && <span className="text-[9px]">Giảm {d.discount * 100}%</span>}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                    <button 
-                        disabled={!selectedPackage || !selectedDuration}
-                        onClick={() => setStep('voucher')}
-                        className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase mt-4 disabled:opacity-50"
-                    >
-                        Tiếp Tục
-                    </button>
                 </div>
             )}
 
@@ -207,7 +173,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                              </div>
                              <div>
                                  <p className="font-black text-gray-800 text-sm">{type === 'gym' ? selectedPackage?.name : ptPackage?.name}</p>
-                                 <p className="text-xs text-gray-500">{type === 'gym' ? selectedDuration?.label : `${ptPackage?.sessions} buổi`}</p>
+                                 <p className="text-xs text-gray-500">{type === 'gym' ? `${selectedPackage?.duration} tháng` : `${ptPackage?.sessions} buổi`}</p>
                              </div>
                         </div>
                         
@@ -220,12 +186,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                                 <span>Giá gốc</span>
                                 <span>{calculation.basePrice.toLocaleString()}đ</span>
                             </div>
-                            {calculation.durationDiscount > 0 && (
-                                <div className="flex justify-between text-green-600">
-                                    <span>Giảm giá thời hạn</span>
-                                    <span>-{Math.round(calculation.basePrice * calculation.durationDiscount).toLocaleString()}đ</span>
-                                </div>
-                            )}
                             {userReferralDiscount > 0 && (
                                 <div className="flex justify-between text-pink-500">
                                     <span>{userDiscountReason}</span>
@@ -255,19 +215,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                                 placeholder="Nhập mã..."
                                 className="flex-1 bg-gray-50 border-none rounded-xl px-4 text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-blue-100"
                             />
-                            <button onClick={handleApplyVoucher} className="bg-blue-500 text-white px-4 rounded-xl font-bold text-xs uppercase shadow-md">Áp Dụng</button>
+                            <button onClick={handleApplyVoucher} className="bg-blue-500 text-white px-4 rounded-xl font-bold text-xs uppercase shadow-md active:scale-95 transition-transform">Áp Dụng</button>
                         </div>
                         {/* Available Vouchers Suggestion */}
                         <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
                             {vouchers.filter(v => (v.type === 'Gift' || v.type.toLowerCase() === type)).map(v => (
-                                <button key={v.id} onClick={() => { setVoucherCode(v.code); }} className="whitespace-nowrap bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-[10px] font-bold border border-blue-100">
+                                <button key={v.id} onClick={() => { setVoucherCode(v.code); }} className="whitespace-nowrap bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-[10px] font-bold border border-blue-100 active:scale-95 transition-transform">
                                     {v.code} (-{v.value * 100}%)
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    <button onClick={handlePayment} className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black uppercase shadow-lg shadow-orange-200 flex items-center justify-center gap-2">
+                    <button onClick={handlePayment} className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black uppercase shadow-lg shadow-orange-200 flex items-center justify-center gap-2 active:scale-95 transition-transform">
                         Thanh Toán Ngay <ArrowRight className="w-5 h-5"/>
                     </button>
                 </div>
@@ -298,7 +258,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                         </div>
                     </div>
                     
-                    <button onClick={finish} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase shadow-xl flex items-center justify-center gap-2">
+                    <button onClick={finish} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-transform">
                         <Check className="w-5 h-5"/> Tôi Đã Chuyển Khoản
                     </button>
                     
@@ -314,7 +274,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                     <h3 className="text-xl font-black text-gray-800 uppercase italic mb-2">Đã Gửi Yêu Cầu!</h3>
                     <p className="text-sm text-gray-500 px-6">Giao dịch đang chờ Admin duyệt. Bạn có thể chat với Admin để được hỗ trợ nhanh hơn.</p>
-                    <button onClick={onClose} className="mt-8 bg-gray-100 text-gray-800 px-8 py-3 rounded-xl font-bold uppercase text-xs">Đóng</button>
+                    <button onClick={onClose} className="mt-8 bg-gray-100 text-gray-800 px-8 py-3 rounded-xl font-bold uppercase text-xs active:scale-95 transition-transform">Đóng</button>
                 </div>
             )}
         </div>

@@ -5,12 +5,16 @@ interface HeroProps {
   image?: string;
   title?: string;
   subtitle?: string;
+  overlayText?: string;
+  overlaySub?: string;
 }
 
-const Hero: React.FC<HeroProps> = ({ image, title, subtitle }) => {
+const Hero: React.FC<HeroProps> = ({ image, title, subtitle, overlayText, overlaySub }) => {
   const bgImage = image || "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600";
   const mainTitle = title || "CÂU LẠC\nBỘ\nGYM";
   const sub = subtitle || "GYM CHO MỌI NGƯỜI";
+  const ovText = overlayText || "Thay đổi bản thân";
+  const ovSub = overlaySub || "Tại Sip Gym Nhà Bè";
 
   return (
     <div className="relative pt-2 pb-6">
@@ -48,8 +52,8 @@ const Hero: React.FC<HeroProps> = ({ image, title, subtitle }) => {
          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
          
          <div className="absolute bottom-6 left-6 text-white">
-            <p className="font-black text-xl uppercase italic drop-shadow-lg">Thay đổi bản thân</p>
-            <p className="text-xs font-medium opacity-90">Tại Sip Gym Nhà Bè</p>
+            <p className="font-black text-xl uppercase italic drop-shadow-lg">{ovText}</p>
+            <p className="text-xs font-medium opacity-90">{ovSub}</p>
          </div>
       </div>
     </div>

@@ -13,7 +13,7 @@ const GlobalNotification: React.FC<GlobalNotificationProps> = ({ title, message,
 
   useEffect(() => {
     setVisible(true);
-    // Tự động đóng sau 4 giây
+    // Tự động đóng sau 4 giây (theo yêu cầu)
     const timer = setTimeout(() => {
       setVisible(false);
       setTimeout(onClose, 300); // Đợi hiệu ứng fade out
@@ -23,8 +23,8 @@ const GlobalNotification: React.FC<GlobalNotificationProps> = ({ title, message,
   }, [onClose]);
 
   return (
-    <div className={`fixed top-4 left-4 right-4 z-[300] transition-all duration-300 transform ${visible ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'}`}>
-       <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border-l-4 border-[#FF6B00] p-4 flex gap-3 relative overflow-hidden">
+    <div className={`fixed top-4 left-4 right-4 z-[300] transition-all duration-500 transform ${visible ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-10 opacity-0 scale-95'}`}>
+       <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border-l-4 border-[#FF6B00] p-4 flex gap-3 relative overflow-hidden animate-in slide-in-from-top-10">
           <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
              <Bell className="w-5 h-5 text-[#FF6B00] animate-bounce" />
           </div>

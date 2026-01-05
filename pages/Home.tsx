@@ -21,6 +21,8 @@ interface HomeProps {
   heroImage?: string; 
   heroTitle?: string;
   heroSubtitle?: string;
+  heroOverlayText?: string;
+  heroOverlaySub?: string;
   onOpenAuth: () => void;
   onLogout: () => void;
   onUpdateSubscription: (packageName: string, months: number, price: number, voucherCode?: string) => void;
@@ -33,7 +35,7 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ 
   user, promotions, trainers, programs, packages, ptPackages, vouchers, 
-  heroImage, heroTitle, heroSubtitle,
+  heroImage, heroTitle, heroSubtitle, heroOverlayText, heroOverlaySub,
   onOpenAuth, onLogout, onUpdateSubscription, onUpdateUser, onRegisterPT, allUsers,
   bookings, onUpdateBookings
 }) => {
@@ -61,7 +63,13 @@ const Home: React.FC<HomeProps> = ({
          <WeatherWidget />
       </div>
 
-      <Hero image={heroImage} title={heroTitle} subtitle={heroSubtitle} />
+      <Hero 
+        image={heroImage} 
+        title={heroTitle} 
+        subtitle={heroSubtitle}
+        overlayText={heroOverlayText}
+        overlaySub={heroOverlaySub}
+      />
       
       {/* Referral Button Block */}
       <div className="px-6 mt-4">

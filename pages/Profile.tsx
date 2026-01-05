@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, Package, PlusCircle, RefreshCw, ClipboardList, LogOut, ShieldCheck, X, Camera, PauseCircle, Users, Lock, ScanFace, UserCheck, Bell } from 'lucide-react';
+import { ArrowLeft, Edit2, Package, PlusCircle, RefreshCw, ClipboardList, LogOut, ShieldCheck, X, Camera, PauseCircle, Users, Lock, ScanFace, UserCheck, Bell, ChevronRight, Settings } from 'lucide-react';
 import { UserProfile, PackageItem, VoucherItem } from '../App';
 import PaymentModal from '../components/PaymentModal';
 import ImageUpload from '../components/ImageUpload';
@@ -20,7 +20,9 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
   const navigate = useNavigate();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  
+  // Settings Modals
+  const [activeSetting, setActiveSetting] = useState<'password' | 'face' | 'referral' | null>(null);
   
   // Edit State
   const [editName, setEditName] = useState('');
@@ -111,6 +113,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
     const newUsers = allUsers.map(u => u.phone === user.phone ? { ...u, password: newPass } : u);
     onUpdateUser(newUsers);
     setNewPass('');
+    setActiveSetting(null);
     alert("Đổi mật khẩu thành công");
   };
 
@@ -129,6 +132,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
        const newUsers = allUsers.map(u => u.phone === user.phone ? { ...u, faceData: base64Image, loginMethod: 'face' as const } : u);
        onUpdateUser(newUsers);
        alert("Đã đăng ký Face ID thành công! Bạn có thể sử dụng khuôn mặt để đăng nhập.");
+       setActiveSetting(null);
      }
   };
 
@@ -144,6 +148,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
     });
     onUpdateUser(newUsers);
     alert("Áp dụng mã thành công!");
+    setActiveSetting(null);
   };
 
   const handlePreserveRequest = () => {
@@ -162,13 +167,6 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
       onUpdateUser(newUsers);
   };
 
-  const menuItems = [
-    { label: 'Đăng ký thêm gói', icon: PlusCircle, color: 'text-blue-500', action: () => setIsPaymentModalOpen(true) },
-    { label: 'Gia hạn gói', icon: RefreshCw, color: 'text-green-500', action: () => setIsPaymentModalOpen(true) },
-    { label: 'Lịch tập luyện', icon: ClipboardList, color: 'text-purple-500', action: () => navigate('/schedule') },
-    { label: 'Cài đặt & Bảo mật', icon: ShieldCheck, color: 'text-orange-500', action: () => setIsSecurityModalOpen(true) },
-  ];
-
   // Referral Calc
   let referralDiscount = 0;
   let discountReason = "";
@@ -181,79 +179,127 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
   }
 
   return (
-    <div className="bg-[#F7FAFC] min-h-screen animate-in slide-in-from-right duration-300 pb-10">
+    <div className="bg-[#F7FAFC] min-h-screen animate-in slide-in-from-right duration-300 pb-24 w-full">
       {/* Top Banner */}
-      <div className="bg-[#FF6B00] h-52 relative overflow-hidden flex items-center px-6">
-        <button onClick={() => navigate('/')} className="absolute top-6 left-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"><ArrowLeft className="w-6 h-6" /></button>
-        <div className="absolute top-[-50px] right-[-50px] w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
+      <div className="bg-[#FF6B00] pt-12 pb-12 relative overflow-hidden rounded-b-[0px] shadow-lg shadow-orange-200/50">
+        <button onClick={() => navigate('/')} className="absolute top-6 left-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white active:scale-95 transition-all z-20"><ArrowLeft className="w-6 h-6" /></button>
+        <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-[-20px] left-10 w-32 h-32 bg-yellow-400/20 rounded-full blur-2xl"></div>
         
-        <div className="flex items-center gap-5 mt-4 w-full z-10">
-          <div className="relative">
-            <div className="w-20 h-20 bg-white rounded-full border-4 border-white/30 shadow-2xl overflow-hidden">
-              {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="avatar" /> : <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.phone}`} className="w-full h-full object-cover" alt="avatar" />}
+        <div className="flex flex-col items-center justify-center relative z-10">
+            <div className="relative group cursor-pointer" onClick={handleEditOpen}>
+                <div className="w-24 h-24 bg-white rounded-full border-4 border-white/30 shadow-2xl overflow-hidden active:scale-95 transition-transform">
+                  {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="avatar" /> : <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.phone}`} className="w-full h-full object-cover" alt="avatar" />}
+                </div>
+                <div className="absolute bottom-0 right-0 bg-white text-[#FF6B00] p-1.5 rounded-full shadow-lg border border-gray-100"><Edit2 className="w-3.5 h-3.5" /></div>
             </div>
-            <button onClick={handleEditOpen} className="absolute bottom-0 right-0 bg-white text-[#FF6B00] p-1.5 rounded-full shadow-lg border border-gray-100"><Edit2 className="w-3 h-3" /></button>
-          </div>
-          <div className="flex-1">
-            <h1 className="text-white text-xl font-black italic uppercase tracking-tighter leading-tight truncate">{user.name || `Member ${user.phone.slice(-4)}`}</h1>
-            <p className="text-white/80 font-bold tracking-widest text-sm">{user.phone}</p>
-            <p className="text-white/80 font-bold text-xs mt-1">Giới tính: {user.gender || 'Chưa cập nhật'}</p>
-          </div>
+            <h1 className="text-white text-xl font-black italic uppercase tracking-tighter leading-tight mt-3">{user.name || `Member ${user.phone.slice(-4)}`}</h1>
+            <p className="text-white/80 font-bold tracking-widest text-xs mt-1">{user.phone} • {user.gender || 'N/A'}</p>
         </div>
       </div>
 
-      <div className="px-5 -mt-8 space-y-4">
-        {/* Referral */}
-        {!user.referredBy && (
-          <div className="bg-white rounded-[32px] p-5 shadow-xl shadow-orange-50 border border-gray-50">
-             <h3 className="text-xs font-black text-gray-500 uppercase mb-2 flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Nhập mã giới thiệu</h3>
-             <div className="flex gap-2">
-                <input type="text" value={referralCodeInput} onChange={(e) => setReferralCodeInput(e.target.value)} placeholder="SĐT người giới thiệu" className="bg-gray-50 px-4 py-2 rounded-xl text-sm font-bold flex-1 outline-none border border-transparent focus:border-orange-500"/>
-                <button onClick={applyReferralCode} className="bg-[#8DBF44] text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-sm">Áp dụng</button>
-             </div>
-          </div>
-        )}
-
-        <div className="bg-white rounded-[32px] p-6 shadow-xl shadow-orange-50 border border-gray-50">
-          <h2 className="text-gray-800 font-black text-lg mb-4 flex items-center gap-2"><Package className="w-5 h-5 text-[#FF6B00]" />Thông Tin Gói Tập</h2>
+      <div className="w-full flex flex-col gap-0">
+        {/* Subscription Info Card - Full Width Style */}
+        <div className="bg-white p-6 shadow-sm border-b border-gray-100">
+          <h2 className="text-gray-800 font-black text-sm uppercase mb-4 flex items-center gap-2"><Package className="w-5 h-5 text-[#FF6B00]" />Thông Tin Gói Tập</h2>
+          
           <div className="space-y-4">
-            <div className="flex justify-between items-center py-2 border-b border-gray-50">
-              <span className="text-gray-400 text-sm font-bold uppercase">Gói đang dùng</span>
-              <span className="text-gray-800 font-black">{user.subscription?.name || 'Chưa đăng ký'}</span>
-            </div>
-            {/* ... other subscription details ... */}
-            <div className="flex justify-between items-center py-2 border-b border-gray-50">
-              <span className="text-gray-400 text-sm font-bold uppercase">Trạng thái</span>
-              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${user.subscription?.status === 'Active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>{user.subscription?.status || 'Trống'}</span>
-            </div>
-             {user.subscription?.status === 'Active' && user.subscription.months >= 6 && (
-                <button onClick={handlePreserveRequest} className="w-full mt-2 border border-purple-200 text-purple-500 hover:bg-purple-50 py-3 rounded-2xl flex items-center justify-center gap-2 text-xs font-black uppercase transition-all"><PauseCircle className="w-4 h-4" /> Yêu cầu bảo lưu</button>
-            )}
+             {user.subscription ? (
+                 <div className="bg-gradient-to-r from-orange-50 to-white p-4 rounded-2xl border border-orange-100">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="font-black text-gray-800 text-lg">{user.subscription.name}</span>
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${user.subscription.status === 'Active' ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`}>{user.subscription.status}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-gray-500">
+                        <span>Hết hạn: {user.subscription.expireDate ? new Date(user.subscription.expireDate).toLocaleDateString('vi-VN') : 'N/A'}</span>
+                        <span>{user.subscription.months} tháng</span>
+                    </div>
+                    {user.subscription.status === 'Active' && user.subscription.months >= 6 && (
+                        <button onClick={handlePreserveRequest} className="mt-3 w-full bg-white border border-purple-200 text-purple-600 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1 active:scale-95 transition-transform"><PauseCircle className="w-3 h-3" /> Bảo Lưu Gói</button>
+                    )}
+                 </div>
+             ) : (
+                 <div className="text-center py-4 bg-gray-50 rounded-2xl">
+                    <p className="text-xs font-bold text-gray-400 mb-2">Bạn chưa đăng ký gói tập nào</p>
+                    <button onClick={() => setIsPaymentModalOpen(true)} className="bg-[#FF6B00] text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-lg shadow-orange-200 active:scale-95 transition-all">Đăng ký ngay</button>
+                 </div>
+             )}
+             
+             {/* Actions */}
+             <div className="grid grid-cols-2 gap-3">
+                 <button onClick={() => setIsPaymentModalOpen(true)} className="bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform hover:bg-blue-100"><PlusCircle className="w-5 h-5"/> Mua thêm gói</button>
+                 <button onClick={() => navigate('/schedule')} className="bg-green-50 text-green-600 py-3 rounded-2xl text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform hover:bg-green-100"><ClipboardList className="w-5 h-5"/> Lịch sử tập</button>
+             </div>
           </div>
         </div>
         
-        {/* PT Section */}
-         {user.ptSubscription && (
-          <div className="bg-white rounded-[32px] p-6 shadow-xl shadow-blue-50 border border-blue-50">
-            <h2 className="text-gray-800 font-black text-lg mb-4 flex items-center gap-2"><UserCheck className="w-5 h-5 text-blue-500" />Thông Tin Gói PT</h2>
-            <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden border border-gray-100"><img src={user.ptSubscription.image} className="w-full h-full object-cover" alt="pt" /></div>
-                <div><p className="font-black text-gray-800 text-sm">{user.ptSubscription.name}</p></div>
+        {/* PT Info */}
+        {user.ptSubscription && (
+          <div className="bg-white p-6 shadow-sm border-b border-gray-100">
+            <h2 className="text-gray-800 font-black text-sm uppercase mb-4 flex items-center gap-2"><UserCheck className="w-5 h-5 text-blue-500" />Huấn Luyện Viên (PT)</h2>
+            <div className="flex items-center gap-4 bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-200 border border-white shadow-sm shrink-0"><img src={user.ptSubscription.image} className="w-full h-full object-cover" alt="pt" /></div>
+                <div className="flex-1">
+                    <p className="font-black text-gray-800 text-sm">{user.ptSubscription.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                       <span className="text-[10px] font-bold text-blue-500 bg-white px-2 py-0.5 rounded-md">Còn {user.ptSubscription.sessionsRemaining}/{user.ptSubscription.totalSessions} buổi</span>
+                    </div>
+                </div>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-[32px] p-4 shadow-xl shadow-orange-50 border border-gray-50 overflow-hidden">
-          {menuItems.map((item, idx) => (
-            <button key={idx} onClick={item.action} className={`w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors ${idx !== menuItems.length - 1 ? 'border-b border-gray-50' : ''}`}>
-              <div className={`w-10 h-10 ${item.color.replace('text', 'bg')}/10 rounded-xl flex items-center justify-center ${item.color}`}><item.icon className="w-5 h-5" /></div>
-              <span className="font-bold text-gray-700">{item.label}</span>
-              <div className="ml-auto w-6 h-6 bg-gray-50 rounded-full flex items-center justify-center"><div className="w-1.5 h-1.5 border-r-2 border-b-2 border-gray-300 rotate-[-45deg]"></div></div>
-            </button>
-          ))}
+        {/* Settings Group */}
+        <div className="bg-white overflow-hidden shadow-sm border-b border-gray-100">
+           <div className="p-4 border-b border-gray-50 bg-gray-50/50"><h2 className="text-gray-800 font-black text-sm uppercase flex items-center gap-2"><Settings className="w-5 h-5 text-gray-400" /> Cài đặt & Tài khoản</h2></div>
+           
+           <div className="divide-y divide-gray-50">
+               {/* Referral */}
+               <button onClick={() => setActiveSetting('referral')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                     <div className="w-9 h-9 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center"><Users className="w-4 h-4"/></div>
+                     <span className="text-sm font-bold text-gray-700">Người giới thiệu</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <span className="text-[10px] font-bold text-gray-400">{user.referredBy || 'Chưa có'}</span>
+                     <ChevronRight className="w-4 h-4 text-gray-300" />
+                  </div>
+               </button>
+
+               {/* Password */}
+               <button onClick={() => setActiveSetting('password')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                     <div className="w-9 h-9 bg-red-100 text-red-600 rounded-xl flex items-center justify-center"><Lock className="w-4 h-4"/></div>
+                     <span className="text-sm font-bold text-gray-700">Đổi mật khẩu</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+               </button>
+
+               {/* Face ID */}
+               <button onClick={() => setActiveSetting('face')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                     <div className="w-9 h-9 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><ScanFace className="w-4 h-4"/></div>
+                     <span className="text-sm font-bold text-gray-700">Đăng nhập khuôn mặt</span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${user.faceData ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>{user.faceData ? 'BẬT' : 'TẮT'}</span>
+               </button>
+
+               {/* Notification */}
+               <div className="w-full flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                     <div className="w-9 h-9 bg-yellow-100 text-yellow-600 rounded-xl flex items-center justify-center"><Bell className="w-4 h-4"/></div>
+                     <span className="text-sm font-bold text-gray-700">Thông báo Popup</span>
+                  </div>
+                  <button onClick={togglePopupNoti} className={`w-10 h-6 rounded-full p-1 transition-colors ${user.settings?.popupNotification ? 'bg-green-500' : 'bg-gray-200'}`}>
+                        <div className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform ${user.settings?.popupNotification ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                  </button>
+               </div>
+           </div>
         </div>
 
-        <button onClick={() => navigate('/')} className="w-full bg-white border-2 border-gray-100 text-gray-400 py-4 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"><LogOut className="w-4 h-4 rotate-180" />Thoát Quay Lại Trang Chủ</button>
+        <div className="p-4 bg-white">
+            <button onClick={() => navigate('/')} className="w-full bg-white border-2 border-gray-100 text-gray-400 py-4 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"><LogOut className="w-4 h-4 rotate-180" />Thoát</button>
+        </div>
       </div>
 
       <PaymentModal 
@@ -269,7 +315,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
          }}
       />
 
-      {/* Edit Profile Modal */}
+      {/* Edit Profile Popup */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEditModalOpen(false)} />
@@ -280,7 +326,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
              </div>
              <div className="space-y-4">
                 <div className="flex justify-center"><div className="w-32 h-32"><ImageUpload currentImage={editAvatar} onImageUploaded={setEditAvatar} label="Ảnh đại diện" aspect="aspect-square" className="rounded-full overflow-hidden shadow-lg border-4 border-orange-50"/></div></div>
-                <div><label className="text-xs font-bold text-gray-400 uppercase ml-1">Tên hiển thị</label><input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-gray-50 rounded-xl py-3 px-4 text-sm font-bold mt-1 focus:outline-none focus:ring-2 focus:ring-[#FF6B00]"/></div>
+                <div><label className="text-xs font-bold text-gray-400 uppercase ml-1">Nickname</label><input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-gray-50 rounded-xl py-3 px-4 text-sm font-bold mt-1 focus:outline-none focus:ring-2 focus:ring-[#FF6B00]"/></div>
                 <div>
                    <label className="text-xs font-bold text-gray-400 uppercase ml-1">Giới tính</label>
                    <div className="flex gap-2 mt-1">
@@ -295,45 +341,60 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
         </div>
       )}
 
-      {/* Security Settings Modal */}
-      {isSecurityModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsSecurityModalOpen(false)} />
-          <div className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 max-h-[85vh] overflow-y-auto">
-             {/* Change Pass */}
-             <div className="space-y-6">
-                <div>
-                   <h4 className="flex items-center gap-2 text-sm font-black text-gray-700 mb-3"><Lock className="w-4 h-4"/> Đổi Mật Khẩu</h4>
-                   <div className="flex gap-2"><input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mật khẩu mới..." className="flex-1 bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-orange-500"/><button onClick={changePassword} className="bg-gray-800 text-white rounded-xl px-4 text-xs font-black uppercase">Lưu</button></div>
-                </div>
-                <hr className="border-gray-100" />
-                
-                {/* Popup Notification Toggle */}
-                <div className="flex items-center justify-between">
-                    <h4 className="flex items-center gap-2 text-sm font-black text-gray-700"><Bell className="w-4 h-4"/> Thông Báo Popup</h4>
-                    <button onClick={togglePopupNoti} className={`w-12 h-7 rounded-full p-1 transition-colors ${user.settings?.popupNotification ? 'bg-green-500' : 'bg-gray-200'}`}>
-                        <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${user.settings?.popupNotification ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                    </button>
-                </div>
+      {/* Settings Action Sheet/Popup */}
+      {activeSetting && (
+        <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center px-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setActiveSetting(null)} />
+          <div className="relative w-full max-w-sm bg-white rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom-20 sm:zoom-in-95">
+             <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-6 sm:hidden"></div>
+             
+             {activeSetting === 'password' && (
+                <>
+                   <h3 className="text-lg font-black text-gray-800 uppercase italic mb-4">Đổi Mật Khẩu</h3>
+                   <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Nhập mật khẩu mới..." className="w-full bg-gray-50 rounded-2xl px-4 py-4 text-sm font-bold outline-none border border-transparent focus:border-red-500 mb-4"/>
+                   <button onClick={changePassword} className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase text-sm shadow-lg shadow-red-200 active:scale-95 transition-transform">Xác Nhận Đổi</button>
+                </>
+             )}
 
-                <hr className="border-gray-100" />
-                {/* Face ID Settings */}
-                <div>
-                   <h4 className="flex items-center gap-2 text-sm font-black text-gray-700 mb-3"><ScanFace className="w-4 h-4"/> Đăng nhập khuôn mặt</h4>
+             {activeSetting === 'referral' && (
+                <>
+                   <h3 className="text-lg font-black text-gray-800 uppercase italic mb-2">Mã Giới Thiệu</h3>
+                   <p className="text-xs text-gray-500 font-medium mb-4">Nhập SĐT người giới thiệu để cả 2 cùng nhận ưu đãi.</p>
+                   {user.referredBy ? (
+                       <div className="bg-green-50 p-4 rounded-2xl text-center border border-green-100">
+                          <p className="text-green-600 font-bold text-sm">Đã được giới thiệu bởi: {user.referredBy}</p>
+                       </div>
+                   ) : (
+                       <>
+                          <input type="tel" value={referralCodeInput} onChange={e => setReferralCodeInput(e.target.value)} placeholder="Số điện thoại..." className="w-full bg-gray-50 rounded-2xl px-4 py-4 text-sm font-bold outline-none border border-transparent focus:border-purple-500 mb-4"/>
+                          <button onClick={applyReferralCode} className="w-full bg-purple-500 text-white py-4 rounded-2xl font-black uppercase text-sm shadow-lg shadow-purple-200 active:scale-95 transition-transform">Áp Dụng</button>
+                       </>
+                   )}
+                </>
+             )}
+
+             {activeSetting === 'face' && (
+                <>
+                   <h3 className="text-lg font-black text-gray-800 uppercase italic mb-4">Cài Đặt Face ID</h3>
                    {isFaceScanning ? (
-                      <div className="bg-black rounded-2xl overflow-hidden aspect-square relative border-4 border-[#FF6B00]">
+                      <div className="bg-black rounded-2xl overflow-hidden aspect-square relative border-4 border-[#FF6B00] mb-4">
                          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transform scale-x-[-1]" />
-                         <div className="absolute bottom-4 left-0 right-0 flex justify-center"><button onClick={captureFace} className="bg-white text-orange-600 px-6 py-2 rounded-full font-black text-xs uppercase shadow-lg">Chụp & Lưu</button></div>
                       </div>
                    ) : (
-                      <div className="bg-orange-50 p-4 rounded-2xl flex items-center justify-between">
-                         <div><p className="text-xs font-bold text-gray-600">Trạng thái: {user.faceData ? <span className="text-green-600">Đã kích hoạt</span> : <span className="text-gray-400">Chưa cài đặt</span>}</p></div>
-                         <button onClick={() => setIsFaceScanning(true)} className="bg-[#FF6B00] text-white p-3 rounded-xl shadow-lg shadow-orange-200"><Camera className="w-5 h-5" /></button>
+                      <div className="bg-orange-50 p-6 rounded-2xl flex flex-col items-center justify-center mb-4 border-2 border-dashed border-orange-200">
+                         <ScanFace className="w-12 h-12 text-orange-400 mb-2"/>
+                         <p className="text-xs font-bold text-gray-600">Trạng thái: {user.faceData ? <span className="text-green-600">Đã kích hoạt</span> : <span className="text-gray-400">Chưa cài đặt</span>}</p>
                       </div>
                    )}
-                </div>
-             </div>
-             <button onClick={() => setIsSecurityModalOpen(false)} className="mt-6 w-full bg-gray-100 text-gray-500 py-3 rounded-xl font-bold uppercase text-xs">Đóng</button>
+                   {isFaceScanning ? (
+                       <button onClick={captureFace} className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black uppercase text-sm shadow-lg shadow-orange-200 active:scale-95 transition-transform">Chụp & Lưu</button>
+                   ) : (
+                       <button onClick={() => setIsFaceScanning(true)} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase text-sm shadow-lg active:scale-95 transition-transform">Bắt đầu quét</button>
+                   )}
+                </>
+             )}
+             
+             <button onClick={() => setActiveSetting(null)} className="w-full mt-3 text-gray-400 font-bold text-xs uppercase py-2">Đóng</button>
           </div>
         </div>
       )}

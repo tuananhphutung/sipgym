@@ -21,6 +21,7 @@ export interface PackageItem {
   price: number;
   image: string;
   description?: string;
+  duration: number; // Number of months
 }
 
 export interface PTPackage {
@@ -124,6 +125,9 @@ export type AdminPermission =
 export interface AdminProfile {
   username: string;
   password?: string; 
+  phone?: string; // Added phone for recovery
+  avatar?: string; // Added avatar
+  faceData?: string; // Added FaceID
   role: 'super_admin' | 'sub_admin';
   name: string;
   permissions: AdminPermission[];
@@ -178,6 +182,10 @@ const AppContent: React.FC = () => {
   const [heroImage, setHeroImage] = useState<string>('https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600');
   const [heroTitle, setHeroTitle] = useState<string>('CÂU LẠC\nBỘ\nGYM');
   const [heroSubtitle, setHeroSubtitle] = useState<string>('GYM CHO MỌI NGƯỜI');
+  
+  // New States for Hero Overlay Text
+  const [heroOverlayText, setHeroOverlayText] = useState<string>('THAY ĐỔI BẢN THÂN');
+  const [heroOverlaySub, setHeroOverlaySub] = useState<string>('Tại Sip Gym Nhà Bè');
 
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [vouchers, setVouchers] = useState<VoucherItem[]>([
@@ -188,8 +196,10 @@ const AppContent: React.FC = () => {
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   
   const [packages, setPackages] = useState<PackageItem[]>([
-    { id: 'gym', name: 'Gói Gym', price: 500000, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300', description: 'Tập gym không giới hạn thời gian.' },
-    { id: 'groupx', name: 'Gói Group X', price: 800000, image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=300', description: 'Bao gồm Yoga, Zumba, Aerobic.' },
+    { id: '1m', name: '1 Tháng', price: 500000, duration: 1, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300', description: 'Tập gym không giới hạn 1 tháng.' },
+    { id: '3m', name: '3 Tháng', price: 1350000, duration: 3, image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=300', description: 'Tiết kiệm 10% so với gói tháng.' },
+    { id: '6m', name: '6 Tháng', price: 2500000, duration: 6, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300', description: 'Tặng thêm 15 ngày tập.' },
+    { id: '1y', name: '1 Năm', price: 4500000, duration: 12, image: 'https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?auto=format&fit=crop&q=80&w=300', description: 'Cam kết thay đổi hình thể.' },
   ]);
 
   const [ptPackages, setPTPackages] = useState<PTPackage[]>([
@@ -220,6 +230,7 @@ const AppContent: React.FC = () => {
         adminList.push({
             username: 'admin',
             password: '123456', 
+            phone: '0909000000',
             role: 'super_admin',
             name: 'Super Admin',
             permissions: [], 
@@ -235,7 +246,10 @@ const AppContent: React.FC = () => {
     localStorage.setItem('sip_gym_admins_db', JSON.stringify(newAdmins));
     if (currentAdmin) {
       const updatedMe = newAdmins.find(a => a.username === currentAdmin.username);
-      if (updatedMe) setCurrentUser(updatedMe as any); // Type cast for simplicity in mixed context
+      if (updatedMe) {
+          setCurrentAdmin(updatedMe);
+          localStorage.setItem('admin_session', JSON.stringify(updatedMe));
+      }
     }
   };
 
@@ -290,6 +304,8 @@ const AppContent: React.FC = () => {
             if (data.heroImage) setHeroImage(data.heroImage);
             if (data.heroTitle) setHeroTitle(data.heroTitle);
             if (data.heroSubtitle) setHeroSubtitle(data.heroSubtitle);
+            if (data.heroOverlayText) setHeroOverlayText(data.heroOverlayText);
+            if (data.heroOverlaySub) setHeroOverlaySub(data.heroOverlaySub);
         }
     });
 
@@ -341,10 +357,12 @@ const AppContent: React.FC = () => {
       dbService.saveAll('bookings', newBookings);
   };
   
-  const syncAppConfig = (config: { heroImage: string, heroTitle: string, heroSubtitle: string }) => {
+  const syncAppConfig = (config: { heroImage: string, heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string }) => {
       setHeroImage(config.heroImage);
       setHeroTitle(config.heroTitle);
       setHeroSubtitle(config.heroSubtitle);
+      if(config.heroOverlayText) setHeroOverlayText(config.heroOverlayText);
+      if(config.heroOverlaySub) setHeroOverlaySub(config.heroOverlaySub);
       dbService.saveAll('app_settings', config);
   };
   
@@ -398,7 +416,7 @@ const AppContent: React.FC = () => {
       months: months, 
       expireDate: null, 
       startDate: Date.now(), 
-      price: pkg ? pkg.price * months : price, 
+      price: price, 
       paidAmount: price, 
       status: 'Pending', 
       packageImage: pkg?.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300',
@@ -443,7 +461,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-white flex flex-col overflow-hidden w-full">
       <PWAPrompt />
       {popupNotification && (
           <GlobalNotification 
@@ -453,7 +471,7 @@ const AppContent: React.FC = () => {
           />
       )}
       
-      <div className={`flex-1 overflow-y-auto no-scrollbar ${isAdminPath ? 'bg-[#FFF7ED]' : 'bg-[#FFF7ED]'}`}>
+      <div className={`flex-1 overflow-y-auto no-scrollbar w-full ${isAdminPath ? 'bg-[#FFF7ED]' : 'bg-[#FFF7ED]'}`}>
         <Routes>
           <Route 
             path="/" 
@@ -477,6 +495,8 @@ const AppContent: React.FC = () => {
                 allUsers={allUsers}
                 bookings={bookings}
                 onUpdateBookings={syncBookings}
+                heroOverlayText={heroOverlayText}
+                heroOverlaySub={heroOverlaySub}
               />
             } 
           />
@@ -484,10 +504,6 @@ const AppContent: React.FC = () => {
           <Route path="/voucher" element={<Voucher vouchers={vouchers} />} />
           <Route path="/support" element={<Support user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} />} />
           <Route path="/profile" element={<Profile user={currentUser} onUpdateSubscription={handleUpdateSubscription} onUpdateUser={syncDB} allUsers={allUsers} packages={packages} vouchers={vouchers} />} />
-          <Route 
-             path="/admin" 
-             element={<AdminLogin admins={admins} onLoginSuccess={handleAdminLoginSuccess} />} 
-          />
           <Route 
             path="/admin/dashboard" 
             element={
@@ -512,6 +528,8 @@ const AppContent: React.FC = () => {
                 heroImage={heroImage}
                 heroTitle={heroTitle}
                 heroSubtitle={heroSubtitle}
+                heroOverlayText={heroOverlayText}
+                heroOverlaySub={heroOverlaySub}
                 onUpdateAppConfig={syncAppConfig}
                 bookings={bookings}
                 onUpdateBookings={syncBookings}
@@ -523,7 +541,11 @@ const AppContent: React.FC = () => {
               />
             } 
           />
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route 
+             path="/admin" 
+             element={<AdminLogin admins={admins} onLoginSuccess={handleAdminLoginSuccess} />} 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         
         {!isAdminPath && <div className="h-28"></div>}
