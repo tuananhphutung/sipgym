@@ -107,6 +107,8 @@ export interface UserProfile {
   messages: ChatMessage[]; 
   trainingDays: string[];
   
+  accountStatus?: 'Pending' | 'Active'; // New field for account approval
+
   referredBy?: string;
   referralBonusAvailable?: boolean;
   hasUsedReferralDiscount?: boolean;
@@ -263,7 +265,8 @@ const AppContent: React.FC = () => {
         notifications: Array.isArray(u.notifications) ? u.notifications : (u.notifications ? Object.values(u.notifications) : []),
         messages: Array.isArray(u.messages) ? u.messages : (u.messages ? Object.values(u.messages) : []),
         trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : []),
-        settings: u.settings || { popupNotification: true }
+        settings: u.settings || { popupNotification: true },
+        accountStatus: u.accountStatus || (u.subscription ? 'Active' : 'Active') // Backward compatibility default
       }));
 
       const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
@@ -283,6 +286,10 @@ const AppContent: React.FC = () => {
                  if (lastMsg.sender === 'admin' && newUserState.settings?.popupNotification) {
                      setPopupNotification({ title: 'Tin nhắn từ Admin', msg: lastMsg.text });
                  }
+             }
+             // Notify if account activated
+             if (oldUserState.accountStatus === 'Pending' && newUserState.accountStatus === 'Active') {
+                 setPopupNotification({ title: 'Tài khoản đã kích hoạt', msg: 'Tài khoản của bạn đã được Admin duyệt. Chào mừng bạn!' });
              }
         }
         if (newUserState) {
@@ -311,27 +318,28 @@ const AppContent: React.FC = () => {
 
     dbService.subscribe('promos', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-      if (list.length > 0) setPromotions(list as Promotion[]);
+      if (data) setPromotions(list as Promotion[]);
     });
 
     dbService.subscribe('vouchers', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-      if (list.length > 0) setVouchers(list as VoucherItem[]);
+      if (data) setVouchers(list as VoucherItem[]);
     });
 
     dbService.subscribe('trainers', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-      if (list.length > 0) setTrainers(list as Trainer[]);
+      if (data) setTrainers(list as Trainer[]);
     });
 
     dbService.subscribe('packages', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-      if (list.length > 0) setPackages(list as PackageItem[]);
+      if (data) setPackages(list as PackageItem[]);
     });
 
     dbService.subscribe('pt_packages', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-      if (list.length > 0) setPTPackages(list as PTPackage[]);
+      // Fix: If data is present (even empty array from DB), use it. Don't fallback to defaults if it's explicitly empty.
+      if (data) setPTPackages(list as PTPackage[]);
     });
 
     const adminSession = localStorage.getItem('admin_session');
@@ -395,12 +403,19 @@ const AppContent: React.FC = () => {
       messages: [],
       trainingDays: [],
       loginMethod: 'password',
-      settings: { popupNotification: true }
+      settings: { popupNotification: true },
+      accountStatus: 'Pending' // Set status to Pending
     };
     
     const newUsers = [...allUsers, newUser];
     syncDB(newUsers);
+    
+    // Auto login & Show popup
     handleLoginSuccess(newUser);
+    setPopupNotification({ 
+        title: 'Đăng ký thành công', 
+        msg: 'Tài khoản của bạn đã được tạo và đang chờ Admin duyệt. Bạn có thể xem trước các gói tập.' 
+    });
   };
 
   const handleLogout = () => {

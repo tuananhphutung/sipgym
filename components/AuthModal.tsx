@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Smartphone, Lock, ScanFace, CheckCircle2, AlertCircle, Camera, User, Mail, ShieldCheck } from 'lucide-react';
+import { X, Smartphone, Lock, ScanFace, CheckCircle2, AlertCircle, Camera, User, Mail, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { UserProfile } from '../App';
 
 interface AuthModalProps {
@@ -16,6 +16,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
   const [step, setStep] = useState<'phone' | 'register_details' | 'password' | 'face' | 'forgot_password' | 'reset_new_pass'>('phone');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [gender, setGender] = useState<'Nam' | 'Nữ' | 'Khác'>('Nam');
   const [error, setError] = useState('');
   const [targetUser, setTargetUser] = useState<UserProfile | null>(null);
@@ -168,6 +169,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
     setResetEmail('');
     setResetCode('');
     setNewPassword('');
+    setShowPassword(false);
     onClose();
   };
 
@@ -242,13 +244,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
             <h2 className="text-2xl font-black text-center text-gray-800 mb-2">Nhập Mật Khẩu</h2>
             
             <form onSubmit={handlePasswordSubmit} className="space-y-4 mt-6">
-               <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  placeholder="******"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-lg font-bold text-center tracking-widest focus:ring-2 focus:ring-[#FF6B00] outline-none"
-                />
+               <div className="relative">
+                 <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    placeholder="******"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-lg font-bold text-center tracking-widest focus:ring-2 focus:ring-[#FF6B00] outline-none"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)} 
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FF6B00]"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+                  </button>
+               </div>
                 {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
                 <button type="submit" className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-orange-200 uppercase">Đăng Nhập</button>
                 
@@ -303,13 +314,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
                        placeholder="Mã xác nhận (VD: 123456)"
                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-center text-lg font-black tracking-widest focus:ring-2 focus:ring-green-200 outline-none"
                     />
-                    <input 
-                       type="password"
-                       value={newPassword}
-                       onChange={e => setNewPassword(e.target.value)}
-                       placeholder="Mật khẩu mới"
-                       className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-sm font-bold focus:ring-2 focus:ring-green-200 outline-none"
-                    />
+                    <div className="relative">
+                        <input 
+                           type={showPassword ? "text" : "password"}
+                           value={newPassword}
+                           onChange={e => setNewPassword(e.target.value)}
+                           placeholder="Mật khẩu mới"
+                           className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-6 text-sm font-bold focus:ring-2 focus:ring-green-200 outline-none"
+                        />
+                        <button 
+                            type="button" 
+                            onClick={() => setShowPassword(!showPassword)} 
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-500"
+                        >
+                            {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+                        </button>
+                    </div>
                     {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
                     <button type="submit" className="w-full bg-green-500 text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-green-200 uppercase">Đổi Mật Khẩu</button>
                 </form>

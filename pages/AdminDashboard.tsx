@@ -165,8 +165,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const pendingPTUsers = allUsers.filter(u => u.ptSubscription?.status === 'Pending');
   const pendingPreserveUsers = allUsers.filter(u => u.subscription?.status === 'Pending Preservation');
   const pendingBookings = bookings.filter(b => b.status === 'Pending');
+  const pendingAccounts = allUsers.filter(u => u.accountStatus === 'Pending'); // New: Pending Accounts
   
-  const totalPendingApprovals = pendingUsers.length + pendingPTUsers.length + pendingPreserveUsers.length + pendingBookings.length;
+  const totalPendingApprovals = pendingUsers.length + pendingPTUsers.length + pendingPreserveUsers.length + pendingBookings.length + pendingAccounts.length;
+
+  // Active Users only for "View Users"
+  const activeUsers = allUsers.filter(u => u.accountStatus !== 'Pending');
 
   // Logic to auto-hide Admin Notification Toast
   useEffect(() => {
@@ -181,7 +185,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   }, [totalPendingApprovals]);
 
-  const filteredUsers = allUsers.filter(u => 
+  // Filter Users Search (Only show active users in list search)
+  const filteredUsers = activeUsers.filter(u => 
      u.phone.includes(searchTerm) || 
      (u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
      (u.realName && u.realName.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -288,6 +293,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           } return u; 
       }); 
       setAllUsers(updatedUsers); 
+  };
+
+  const handleApproveAccount = (phone: string) => {
+      const updatedUsers = allUsers.map(u => {
+          if (u.phone === phone) {
+              return { 
+                  ...u, 
+                  accountStatus: 'Active' as const,
+                  notifications: [{ 
+                      id: Math.random().toString(), 
+                      text: `Chào mừng! Tài khoản của bạn đã được Admin duyệt thành công.`, 
+                      date: Date.now(), 
+                      read: false 
+                  }, ...u.notifications]
+              };
+          }
+          return u;
+      });
+      setAllUsers(updatedUsers);
   };
   
   const handleBroadcast = () => { 
@@ -643,6 +667,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                <button onClick={(e) => { e.stopPropagation(); setShowAdminToast(false); }} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3"/></button>
             </div>
             <div className="space-y-1">
+                {pendingAccounts.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingAccounts.length} đăng ký tài khoản mới</p>}
                 {pendingUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingUsers.length} gói tập Gym mới</p>}
                 {pendingPTUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingPTUsers.length} đăng ký PT mới</p>}
                 {pendingBookings.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingBookings.length} lịch đặt PT</p>}
@@ -697,7 +722,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <Users className="w-5 h-5" />
                </div>
                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tổng Hội Viên</p>
-               {hasPermission('view_users') ? <p className="text-2xl font-black text-gray-800">{allUsers.length}</p> : <p className="text-sm italic text-gray-400">Hidden</p>}
+               {hasPermission('view_users') ? <p className="text-2xl font-black text-gray-800">{activeUsers.length}</p> : <p className="text-sm italic text-gray-400">Hidden</p>}
           </div>
           
            {/* Settings Toggle Card */}
@@ -785,6 +810,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {/* 1. Pending Approvals */}
                   {showPopup === 'pending_approvals' && (
                       <div className="space-y-6">
+                          {/* Pending Accounts */}
+                          {pendingAccounts.length > 0 && (
+                             <div>
+                                <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Tài Khoản Mới ({pendingAccounts.length})</h4>
+                                <div className="space-y-2">
+                                   {pendingAccounts.map(u => (
+                                      <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex justify-between items-center">
+                                         <div>
+                                            <p className="font-bold text-gray-800 text-sm">{u.realName || u.name}</p>
+                                            <p className="text-xs text-gray-500 font-medium">{u.phone}</p>
+                                         </div>
+                                         <button onClick={() => handleApproveAccount(u.phone)} className="bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-blue-200">Duyệt TK</button>
+                                      </div>
+                                   ))}
+                                </div>
+                             </div>
+                          )}
+
                           {/* Bookings */}
                           {pendingBookings.length > 0 && (
                              <div>
@@ -909,6 +952,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </div>
                               <input value={editingRealName} onChange={e => setEditingRealName(e.target.value)} className="text-center font-black text-lg bg-transparent border-b border-gray-200 focus:border-orange-500 outline-none pb-1" placeholder="Tên thật"/>
                               <p className="text-xs font-bold text-gray-400 mt-1">{selectedUser.phone}</p>
+                              <div className="flex justify-center mt-1">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedUser.accountStatus === 'Active' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                                      {selectedUser.accountStatus === 'Active' ? 'Active' : 'Pending Approval'}
+                                  </span>
+                              </div>
                               
                               <div className="grid grid-cols-2 gap-2 w-full mt-4">
                                   <button onClick={() => setShowPopup('chat')} className="bg-blue-50 text-blue-600 py-2 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-1"><MessageSquare className="w-4 h-4"/> Chat</button>

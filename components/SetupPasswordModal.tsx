@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Lock, Check } from 'lucide-react';
+import { Lock, Check, Eye, EyeOff } from 'lucide-react';
 import { UserProfile } from '../App';
 
 interface SetupPasswordModalProps {
@@ -15,6 +15,7 @@ const SetupPasswordModal: React.FC<SetupPasswordModalProps> = ({ isOpen, onClose
   const [pass, setPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [error, setError] = useState('');
+  const [showPass, setShowPass] = useState(false);
 
   if (!isOpen || !user) return null;
 
@@ -53,20 +54,29 @@ const SetupPasswordModal: React.FC<SetupPasswordModalProps> = ({ isOpen, onClose
         <p className="text-center text-gray-500 text-xs mb-6 px-4">Để bảo vệ tài khoản, vui lòng tạo mật khẩu cho lần đăng nhập sau.</p>
         
         <form onSubmit={handleSubmit} className="space-y-3">
-           <input 
-             type="password" 
-             placeholder="Mật khẩu mới (tối thiểu 6 ký tự)" 
-             value={pass}
-             onChange={e => setPass(e.target.value)}
-             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:border-orange-500"
-           />
-           <input 
-             type="password" 
-             placeholder="Nhập lại mật khẩu" 
-             value={confirmPass}
-             onChange={e => setConfirmPass(e.target.value)}
-             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:border-orange-500"
-           />
+           <div className="relative">
+             <input 
+               type={showPass ? "text" : "password"} 
+               placeholder="Mật khẩu mới (tối thiểu 6 ký tự)" 
+               value={pass}
+               onChange={e => setPass(e.target.value)}
+               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:border-orange-500 pr-10"
+             />
+             <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500">
+               {showPass ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
+             </button>
+           </div>
+           
+           <div className="relative">
+             <input 
+               type={showPass ? "text" : "password"}
+               placeholder="Nhập lại mật khẩu" 
+               value={confirmPass}
+               onChange={e => setConfirmPass(e.target.value)}
+               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:border-orange-500 pr-10"
+             />
+           </div>
+
            {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
            
            <button type="submit" className="w-full bg-[#FF6B00] text-white py-3 rounded-xl font-black uppercase text-sm shadow-lg mt-2">
