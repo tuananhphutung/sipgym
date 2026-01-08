@@ -310,6 +310,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
          vouchers={vouchers}
          userReferralDiscount={referralDiscount}
          userDiscountReason={discountReason}
+         user={user}
          onConfirm={(data) => {
             onUpdateSubscription(data.packageName, data.months, data.price, data.voucherCode);
          }}

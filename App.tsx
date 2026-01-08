@@ -8,15 +8,22 @@ import Voucher from './pages/Voucher';
 import Support from './pages/Support';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import AuthPage from './components/AuthPage'; // New Auth Page
 import BottomNav from './components/BottomNav';
-import AuthModal from './components/AuthModal';
 import SetupPasswordModal from './components/SetupPasswordModal';
 import PWAPrompt from './components/PWAPrompt';
 import GlobalNotification from './components/GlobalNotification'; 
 import { dbService } from './services/firebase';
 
+// New Interfaces
+export interface Category {
+  id: 'gym' | 'groupx';
+  name: string;
+}
+
 export interface PackageItem {
   id: string;
+  categoryId: 'gym' | 'groupx';
   name: string;
   price: number;
   image: string;
@@ -33,6 +40,17 @@ export interface PTPackage {
   description?: string;
 }
 
+export interface RevenueTransaction {
+  id: string;
+  userId: string;
+  userName: string;
+  packageName: string;
+  amount: number;
+  date: number;
+  type: 'Gym' | 'PT';
+  method: 'Cash' | 'Transfer';
+}
+
 export interface Subscription {
   name: string;
   months: number;
@@ -40,7 +58,7 @@ export interface Subscription {
   startDate: number;
   price: number;
   paidAmount: number; 
-  paymentMethod?: string;
+  paymentMethod?: 'Cash' | 'Transfer';
   voucherCode?: string;
   status: 'Pending' | 'Active' | 'Expired' | 'Rejected' | 'Pending Preservation' | 'Preserved';
   packageImage?: string;
@@ -97,7 +115,10 @@ export interface UserProfile {
   
   realName?: string; 
   name?: string; 
-  email?: string; // Added email for recovery
+  email?: string; 
+  address?: string; // New
+  securityQuestion?: string; // New
+  securityAnswer?: string; // New
   
   avatar: string | null;
   subscription: Subscription | null;
@@ -106,8 +127,9 @@ export interface UserProfile {
   notifications: Notification[];
   messages: ChatMessage[]; 
   trainingDays: string[];
+  savedVouchers: string[]; // List of voucher IDs owned
   
-  accountStatus?: 'Pending' | 'Active'; // New field for account approval
+  accountStatus?: 'Active'; // Always Active after registration per request
 
   referredBy?: string;
   referralBonusAvailable?: boolean;
@@ -127,9 +149,9 @@ export type AdminPermission =
 export interface AdminProfile {
   username: string;
   password?: string; 
-  phone?: string; // Added phone for recovery
-  avatar?: string; // Added avatar
-  faceData?: string; // Added FaceID
+  phone?: string; 
+  avatar?: string; 
+  faceData?: string; 
   role: 'super_admin' | 'sub_admin';
   name: string;
   permissions: AdminPermission[];
@@ -175,17 +197,17 @@ const AppContent: React.FC = () => {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [transactions, setTransactions] = useState<RevenueTransaction[]>([]);
   
   // Admin State
   const [currentAdmin, setCurrentAdmin] = useState<AdminProfile | null>(null);
   const [admins, setAdmins] = useState<AdminProfile[]>([]);
 
   // App Settings State
+  const [appLogo, setAppLogo] = useState<string>('https://phukienlimousine.vn/wp-content/uploads/2025/12/LOGO_SIP_GYM_pages-to-jpg-0001-removebg-preview.png');
   const [heroImage, setHeroImage] = useState<string>('https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600');
   const [heroTitle, setHeroTitle] = useState<string>('CÂU LẠC\nBỘ\nGYM');
   const [heroSubtitle, setHeroSubtitle] = useState<string>('GYM CHO MỌI NGƯỜI');
-  
-  // New States for Hero Overlay Text
   const [heroOverlayText, setHeroOverlayText] = useState<string>('THAY ĐỔI BẢN THÂN');
   const [heroOverlaySub, setHeroOverlaySub] = useState<string>('Tại Sip Gym Nhà Bè');
 
@@ -197,11 +219,16 @@ const AppContent: React.FC = () => {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   
+  // New Package Structure
   const [packages, setPackages] = useState<PackageItem[]>([
-    { id: '1m', name: '1 Tháng', price: 500000, duration: 1, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300', description: 'Tập gym không giới hạn 1 tháng.' },
-    { id: '3m', name: '3 Tháng', price: 1350000, duration: 3, image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=300', description: 'Tiết kiệm 10% so với gói tháng.' },
-    { id: '6m', name: '6 Tháng', price: 2500000, duration: 6, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300', description: 'Tặng thêm 15 ngày tập.' },
-    { id: '1y', name: '1 Năm', price: 4500000, duration: 12, image: 'https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?auto=format&fit=crop&q=80&w=300', description: 'Cam kết thay đổi hình thể.' },
+    // Gym Packages
+    { id: '1m', categoryId: 'gym', name: '1 Tháng', price: 500000, duration: 1, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300', description: 'Tập gym không giới hạn 1 tháng.' },
+    { id: '3m', categoryId: 'gym', name: '3 Tháng', price: 1350000, duration: 3, image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=300', description: 'Tiết kiệm 10%.' },
+    { id: '6m', categoryId: 'gym', name: '6 Tháng', price: 2500000, duration: 6, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300', description: 'Tặng thêm 15 ngày.' },
+    { id: '1y', categoryId: 'gym', name: '1 Năm', price: 4500000, duration: 12, image: 'https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?auto=format&fit=crop&q=80&w=300', description: 'Cam kết thay đổi hình thể.' },
+    // Group X Packages
+    { id: 'yoga', categoryId: 'groupx', name: 'Yoga', price: 600000, duration: 1, image: 'https://images.unsplash.com/photo-1544367563-12123d8959bd?auto=format&fit=crop&q=80&w=300', description: 'Lớp Yoga thư giãn.' },
+    { id: 'aerobic', categoryId: 'groupx', name: 'Aerobic', price: 550000, duration: 1, image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=300', description: 'Nhảy Aerobic sôi động.' },
   ]);
 
   const [ptPackages, setPTPackages] = useState<PTPackage[]>([
@@ -209,7 +236,6 @@ const AppContent: React.FC = () => {
      { id: 'pt2', name: 'PT 1 Kèm 1 (24 Buổi)', price: 6500000, sessions: 24, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300', description: 'Cam kết thay đổi hình thể.' }
   ]);
 
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSetupPassOpen, setIsSetupPassOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true); 
   
@@ -265,8 +291,9 @@ const AppContent: React.FC = () => {
         notifications: Array.isArray(u.notifications) ? u.notifications : (u.notifications ? Object.values(u.notifications) : []),
         messages: Array.isArray(u.messages) ? u.messages : (u.messages ? Object.values(u.messages) : []),
         trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : []),
+        savedVouchers: Array.isArray(u.savedVouchers) ? u.savedVouchers : [],
         settings: u.settings || { popupNotification: true },
-        accountStatus: u.accountStatus || (u.subscription ? 'Active' : 'Active') // Backward compatibility default
+        accountStatus: 'Active' // Force Active for all users per request
       }));
 
       const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
@@ -287,18 +314,18 @@ const AppContent: React.FC = () => {
                      setPopupNotification({ title: 'Tin nhắn từ Admin', msg: lastMsg.text });
                  }
              }
-             // Notify if account activated
-             if (oldUserState.accountStatus === 'Pending' && newUserState.accountStatus === 'Active') {
-                 setPopupNotification({ title: 'Tài khoản đã kích hoạt', msg: 'Tài khoản của bạn đã được Admin duyệt. Chào mừng bạn!' });
-             }
         }
         if (newUserState) {
           setCurrentUser(newUserState);
-          if (!newUserState.password) setIsSetupPassOpen(true);
         }
       }
       setAllUsers(sanitizedUsers);
       setIsLoading(false);
+    });
+
+    dbService.subscribe('transactions', (data: any) => {
+        let raw = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+        setTransactions(raw as RevenueTransaction[]);
     });
 
     dbService.subscribe('bookings', (data: any) => {
@@ -308,6 +335,7 @@ const AppContent: React.FC = () => {
 
     dbService.subscribe('app_settings', (data: any) => {
         if (data) {
+            if (data.appLogo) setAppLogo(data.appLogo);
             if (data.heroImage) setHeroImage(data.heroImage);
             if (data.heroTitle) setHeroTitle(data.heroTitle);
             if (data.heroSubtitle) setHeroSubtitle(data.heroSubtitle);
@@ -338,7 +366,6 @@ const AppContent: React.FC = () => {
 
     dbService.subscribe('pt_packages', (data: any) => {
       const list = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-      // Fix: If data is present (even empty array from DB), use it. Don't fallback to defaults if it's explicitly empty.
       if (data) setPTPackages(list as PTPackage[]);
     });
 
@@ -360,12 +387,18 @@ const AppContent: React.FC = () => {
     dbService.saveAll('users', newUsers);
   };
 
+  const syncTransactions = (newTrans: RevenueTransaction[]) => {
+      setTransactions(newTrans);
+      dbService.saveAll('transactions', newTrans);
+  };
+
   const syncBookings = (newBookings: Booking[]) => {
       setBookings(newBookings);
       dbService.saveAll('bookings', newBookings);
   };
   
-  const syncAppConfig = (config: { heroImage: string, heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string }) => {
+  const syncAppConfig = (config: { appLogo: string, heroImage: string, heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string }) => {
+      setAppLogo(config.appLogo);
       setHeroImage(config.heroImage);
       setHeroTitle(config.heroTitle);
       setHeroSubtitle(config.heroSubtitle);
@@ -383,39 +416,6 @@ const AppContent: React.FC = () => {
   const handleLoginSuccess = (user: UserProfile) => {
     localStorage.setItem('sip_gym_logged_phone', user.phone);
     setCurrentUser(user);
-    setIsAuthModalOpen(false);
-    if (!user.password) {
-       setIsSetupPassOpen(true);
-    }
-  };
-
-  const handleRegister = (phone: string, gender: 'Nam' | 'Nữ' | 'Khác') => {
-    const newUser: UserProfile = { 
-      phone, 
-      gender,
-      realName: `Hội viên mới`, 
-      name: `Member ${phone.slice(-4)}`,
-      avatar: null, 
-      subscription: null,
-      ptSubscription: null,
-      isLocked: false, 
-      notifications: [], 
-      messages: [],
-      trainingDays: [],
-      loginMethod: 'password',
-      settings: { popupNotification: true },
-      accountStatus: 'Pending' // Set status to Pending
-    };
-    
-    const newUsers = [...allUsers, newUser];
-    syncDB(newUsers);
-    
-    // Auto login & Show popup
-    handleLoginSuccess(newUser);
-    setPopupNotification({ 
-        title: 'Đăng ký thành công', 
-        msg: 'Tài khoản của bạn đã được tạo và đang chờ Admin duyệt. Bạn có thể xem trước các gói tập.' 
-    });
   };
 
   const handleLogout = () => {
@@ -423,7 +423,7 @@ const AppContent: React.FC = () => {
     setCurrentUser(null);
   };
   
-  const handleUpdateSubscription = (packageName: string, months: number, price: number, voucherCode?: string) => {
+  const handleUpdateSubscription = (packageName: string, months: number, price: number, method: 'Cash' | 'Transfer', voucherCode?: string) => {
     if (!currentUser) return;
     const pkg = packages.find(p => p.name === packageName);
     const newSubscription: Subscription = {
@@ -435,18 +435,35 @@ const AppContent: React.FC = () => {
       paidAmount: price, 
       status: 'Pending', 
       packageImage: pkg?.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300',
-      paymentMethod: 'Transfer',
+      paymentMethod: method,
       voucherCode: voucherCode
     };
     let updatedUser = { ...currentUser, subscription: newSubscription };
+    
+    // Add Transaction Record (Independent of user)
+    const newTrans: RevenueTransaction = {
+        id: Date.now().toString(),
+        userId: currentUser.phone,
+        userName: currentUser.name || currentUser.phone,
+        packageName: packageName,
+        amount: price,
+        date: Date.now(),
+        type: 'Gym',
+        method: method
+    };
+    syncTransactions([...transactions, newTrans]);
+
     if (updatedUser.referralBonusAvailable) updatedUser.referralBonusAvailable = false;
     else if (updatedUser.referredBy && !updatedUser.hasUsedReferralDiscount) updatedUser.hasUsedReferralDiscount = true;
 
+    // Use Voucher Logic: Remove if single-use (Optional, current requirement implies re-usable or not specified, assumed multi-use unless specific)
+    
     const newUsers = allUsers.map(u => u.phone === currentUser.phone ? updatedUser : u);
     syncDB(newUsers);
+    setPopupNotification({ title: 'Đăng ký thành công', msg: 'Gói tập đang chờ Admin duyệt.' });
   };
 
-  const handleRegisterPT = (ptPackage: PTPackage, paidAmount: number, voucherCode?: string) => {
+  const handleRegisterPT = (ptPackage: PTPackage, paidAmount: number, method: 'Cash' | 'Transfer', voucherCode?: string) => {
     if (!currentUser) return;
     const newPTSub: PTSubscription = {
       packageId: ptPackage.id, 
@@ -458,8 +475,23 @@ const AppContent: React.FC = () => {
       image: ptPackage.image, 
       status: 'Pending',
     };
+    
+    // Add Transaction Record
+    const newTrans: RevenueTransaction = {
+        id: Date.now().toString(),
+        userId: currentUser.phone,
+        userName: currentUser.name || currentUser.phone,
+        packageName: ptPackage.name,
+        amount: paidAmount,
+        date: Date.now(),
+        type: 'PT',
+        method: method
+    };
+    syncTransactions([...transactions, newTrans]);
+
     const newUsers = allUsers.map(u => u.phone === currentUser.phone ? { ...u, ptSubscription: newPTSub } : u);
     syncDB(newUsers);
+    setPopupNotification({ title: 'Đăng ký PT thành công', msg: 'Gói PT đang chờ Admin duyệt.' });
   };
 
   const handleAdminLoginSuccess = (admin: AdminProfile) => {
@@ -491,34 +523,43 @@ const AppContent: React.FC = () => {
           <Route 
             path="/" 
             element={
-              <Home 
-                user={currentUser} 
-                promotions={promotions}
-                trainers={trainers}
-                programs={programs}
-                packages={packages}
-                ptPackages={ptPackages}
-                vouchers={vouchers}
-                heroImage={heroImage}
-                heroTitle={heroTitle}
-                heroSubtitle={heroSubtitle}
-                onOpenAuth={() => setIsAuthModalOpen(true)} 
-                onLogout={handleLogout}
-                onUpdateUser={syncDB}
-                onUpdateSubscription={handleUpdateSubscription}
-                onRegisterPT={handleRegisterPT}
-                allUsers={allUsers}
-                bookings={bookings}
-                onUpdateBookings={syncBookings}
-                heroOverlayText={heroOverlayText}
-                heroOverlaySub={heroOverlaySub}
-              />
+              currentUser ? (
+                <Home 
+                  user={currentUser} 
+                  promotions={promotions}
+                  trainers={trainers}
+                  programs={programs}
+                  packages={packages}
+                  ptPackages={ptPackages}
+                  vouchers={vouchers}
+                  appLogo={appLogo}
+                  heroImage={heroImage}
+                  heroTitle={heroTitle}
+                  heroSubtitle={heroSubtitle}
+                  heroOverlayText={heroOverlayText}
+                  heroOverlaySub={heroOverlaySub}
+                  onLogout={handleLogout}
+                  onUpdateUser={syncDB}
+                  onUpdateSubscription={handleUpdateSubscription}
+                  onRegisterPT={handleRegisterPT}
+                  allUsers={allUsers}
+                  bookings={bookings}
+                  onUpdateBookings={syncBookings}
+                />
+              ) : (
+                <AuthPage 
+                   allUsers={allUsers} 
+                   onLoginSuccess={handleLoginSuccess}
+                   onUpdateUsers={syncDB}
+                />
+              )
             } 
           />
-          <Route path="/schedule" element={<TrainingSchedule user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} bookings={bookings} onUpdateBookings={syncBookings} />} />
-          <Route path="/voucher" element={<Voucher vouchers={vouchers} />} />
-          <Route path="/support" element={<Support user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} />} />
-          <Route path="/profile" element={<Profile user={currentUser} onUpdateSubscription={handleUpdateSubscription} onUpdateUser={syncDB} allUsers={allUsers} packages={packages} vouchers={vouchers} />} />
+          <Route path="/schedule" element={currentUser ? <TrainingSchedule user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} bookings={bookings} onUpdateBookings={syncBookings} /> : <Navigate to="/" replace />} />
+          <Route path="/voucher" element={currentUser ? <Voucher user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} vouchers={vouchers} /> : <Navigate to="/" replace />} />
+          <Route path="/support" element={currentUser ? <Support user={currentUser} allUsers={allUsers} onUpdateUser={syncDB} /> : <Navigate to="/" replace />} />
+          <Route path="/profile" element={currentUser ? <Profile user={currentUser} onUpdateSubscription={handleUpdateSubscription} onUpdateUser={syncDB} allUsers={allUsers} packages={packages} vouchers={vouchers} /> : <Navigate to="/" replace />} />
+          
           <Route 
             path="/admin/dashboard" 
             element={
@@ -563,22 +604,10 @@ const AppContent: React.FC = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         
-        {!isAdminPath && <div className="h-28"></div>}
+        {(!isAdminPath && currentUser) && <div className="h-28"></div>}
       </div>
-      {!isAdminPath && <BottomNav />}
+      {(!isAdminPath && currentUser) && <BottomNav />}
       
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
-        allUsers={allUsers}
-        onLoginSuccess={handleLoginSuccess}
-        onRegister={handleRegister}
-        onResetPassword={(phone, newPass) => {
-            const newUsers = allUsers.map(u => u.phone === phone ? { ...u, password: newPass } : u);
-            syncDB(newUsers);
-        }}
-      />
-
       <SetupPasswordModal
         isOpen={isSetupPassOpen}
         onClose={() => { 

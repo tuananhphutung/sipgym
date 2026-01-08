@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserProfile, Promotion, Trainer, TrainingProgram, VoucherItem, PackageItem, PTPackage, AdminProfile, AdminPermission, Booking } from '../App';
+import { UserProfile, Promotion, Trainer, TrainingProgram, VoucherItem, PackageItem, PTPackage, AdminProfile, AdminPermission, Booking, RevenueTransaction } from '../App';
 import { 
   Check, X, Plus, Users, BarChart3, TrendingUp, 
   MessageSquare, Bell, Lock, Unlock, 
@@ -9,9 +9,11 @@ import {
   Calendar, Settings, Search, Send, ArrowRight,
   Megaphone, UserPlus, ListFilter, Package, PauseCircle, Trash2, Dumbbell,
   UserCheck, Menu, Eye, ShieldAlert, BadgeCheck, Pencil, CreditCard, Image as ImageIcon2, Clock,
-  CalendarCheck, AlertCircle, Save, Upload, Type, ScanFace, Phone, Edit3, ChevronRight, ChevronLeft, User as UserIcon, MoreHorizontal, Filter, CheckCircle2
+  CalendarCheck, AlertCircle, Save, Upload, Type, ScanFace, Phone, Edit3, ChevronRight, ChevronLeft, User as UserIcon, MoreHorizontal, Filter, CheckCircle2,
+  Crop
 } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
+import { dbService } from '../services/firebase';
 
 interface AdminDashboardProps {
   currentAdmin: AdminProfile | null;
@@ -37,7 +39,7 @@ interface AdminDashboardProps {
   heroSubtitle: string;
   heroOverlayText?: string;
   heroOverlaySub?: string;
-  onUpdateAppConfig: (config: {heroImage: string, heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string}) => void;
+  onUpdateAppConfig: (config: {appLogo: string, heroImage: string, heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string}) => void;
   
   bookings: Booking[];
   onUpdateBookings: (bookings: Booking[]) => void;
@@ -88,14 +90,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newVoucher, setNewVoucher] = useState({ title: '', code: '', type: 'Gym' as const, value: 0.1, color: 'bg-orange-500', image: '' });
   const [newPT, setNewPT] = useState({ name: '', specialty: '', image: '', rating: 5 });
   
-  // Package with Duration
-  const [newPackage, setNewPackage] = useState({ name: '', price: '', image: '', description: '', duration: '' });
+  // Package with Duration (Restored state for new structure)
+  const [newPackage, setNewPackage] = useState({ name: '', price: '', image: '', description: '', duration: '', categoryId: 'gym' as 'gym'|'groupx' });
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
 
   const [newPTPackage, setNewPTPackage] = useState({ name: '', price: '', sessions: '', image: '', description: '' });
   
   // Hero Config State
-  const [configHero, setConfigHero] = useState({ image: '', title: '', subtitle: '', overlayText: '', overlaySub: '' });
+  const [configHero, setConfigHero] = useState({ 
+      appLogo: 'https://phukienlimousine.vn/wp-content/uploads/2025/12/LOGO_SIP_GYM_pages-to-jpg-0001-removebg-preview.png',
+      image: '', title: '', subtitle: '', overlayText: '', overlaySub: '' 
+  });
 
   // Edit User State
   const [editingRealName, setEditingRealName] = useState('');
@@ -115,6 +120,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Admin Notification Toast State (Auto Hide)
   const [showAdminToast, setShowAdminToast] = useState(true);
+
+  // Revenue Transactions
+  const [transactions, setTransactions] = useState<RevenueTransaction[]>([]);
+  
+  useEffect(() => {
+      // Fetch Transactions for independent revenue
+      dbService.subscribe('transactions', (data: any) => {
+          let raw = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+          setTransactions(raw);
+      });
+  }, []);
 
   useEffect(() => {
     if (!currentAdmin) {
@@ -144,6 +160,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
       if (showPopup === 'config_hero') {
           setConfigHero({ 
+              appLogo: 'https://phukienlimousine.vn/wp-content/uploads/2025/12/LOGO_SIP_GYM_pages-to-jpg-0001-removebg-preview.png',
               image: heroImage, 
               title: heroTitle, 
               subtitle: heroSubtitle,
@@ -165,12 +182,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const pendingPTUsers = allUsers.filter(u => u.ptSubscription?.status === 'Pending');
   const pendingPreserveUsers = allUsers.filter(u => u.subscription?.status === 'Pending Preservation');
   const pendingBookings = bookings.filter(b => b.status === 'Pending');
-  const pendingAccounts = allUsers.filter(u => u.accountStatus === 'Pending'); // New: Pending Accounts
+  // Removed pendingAccounts check since we auto-approve registration now, or keeping it just in case logic changes
   
-  const totalPendingApprovals = pendingUsers.length + pendingPTUsers.length + pendingPreserveUsers.length + pendingBookings.length + pendingAccounts.length;
+  const totalPendingApprovals = pendingUsers.length + pendingPTUsers.length + pendingPreserveUsers.length + pendingBookings.length;
 
   // Active Users only for "View Users"
-  const activeUsers = allUsers.filter(u => u.accountStatus !== 'Pending');
+  const activeUsers = allUsers; // Show all users
 
   // Logic to auto-hide Admin Notification Toast
   useEffect(() => {
@@ -185,7 +202,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   }, [totalPendingApprovals]);
 
-  // Filter Users Search (Only show active users in list search)
   const filteredUsers = activeUsers.filter(u => 
      u.phone.includes(searchTerm) || 
      (u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -252,7 +268,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
 
-  const handleDeleteUser = () => { if (!selectedUserPhone) return; if (window.confirm("BẠN CÓ CHẮC MUỐN XÓA USER NÀY? Hành động này không thể hoàn tác.")) { const newUsers = allUsers.filter(u => u.phone !== selectedUserPhone); setAllUsers(newUsers); setShowPopup(null); alert("Đã xóa user thành công."); } };
+  const handleDeleteUser = () => { 
+      if (!selectedUserPhone) return; 
+      if (window.confirm("BẠN CÓ CHẮC MUỐN XÓA USER NÀY? Tài khoản sẽ mất vĩnh viễn, nhưng lịch sử doanh thu vẫn được giữ lại.")) { 
+          const newUsers = allUsers.filter(u => u.phone !== selectedUserPhone); 
+          setAllUsers(newUsers); 
+          setShowPopup(null); 
+          alert("Đã xóa user thành công."); 
+      } 
+  };
   
   const handleApprove = (phone: string) => { 
       const updatedUsers = allUsers.map(u => { 
@@ -294,25 +318,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }); 
       setAllUsers(updatedUsers); 
   };
-
-  const handleApproveAccount = (phone: string) => {
-      const updatedUsers = allUsers.map(u => {
-          if (u.phone === phone) {
-              return { 
-                  ...u, 
-                  accountStatus: 'Active' as const,
-                  notifications: [{ 
-                      id: Math.random().toString(), 
-                      text: `Chào mừng! Tài khoản của bạn đã được Admin duyệt thành công.`, 
-                      date: Date.now(), 
-                      read: false 
-                  }, ...u.notifications]
-              };
-          }
-          return u;
-      });
-      setAllUsers(updatedUsers);
-  };
   
   const handleBroadcast = () => { 
       if (!broadcastMsg.trim()) return; 
@@ -334,6 +339,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveAppConfig = () => { 
       onUpdateAppConfig({ 
+          appLogo: configHero.appLogo,
           heroImage: configHero.image, 
           heroTitle: configHero.title, 
           heroSubtitle: configHero.subtitle,
@@ -372,30 +378,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const togglePopupNotiSetting = () => { if (!currentAdmin) return; const newSettings = { ...currentAdmin.settings, showPopupNoti: !currentAdmin.settings.showPopupNoti }; const updatedAdmin = { ...currentAdmin, settings: newSettings }; const updatedAdmins = admins.map(a => a.username === currentAdmin.username ? updatedAdmin : a); setAdmins(updatedAdmins); };
   
   const calculateRevenue = () => { 
-      let total = 0; 
       const checkDate = new Date(revenueDate).toDateString(); 
-      allUsers.forEach(user => { 
-          if (user.subscription && user.subscription.status === 'Active' && user.subscription.startDate) { 
-              if (new Date(user.subscription.startDate).toDateString() === checkDate) { 
-                  total += (user.subscription.paidAmount || user.subscription.price); 
-              } 
-          } 
-          if (user.ptSubscription && user.ptSubscription.status === 'Active' && user.ptSubscription.startDate) { 
-              if (new Date(user.ptSubscription.startDate).toDateString() === checkDate) { 
-                  total += (user.ptSubscription.paidAmount || user.ptSubscription.price); 
-              } 
-          } 
-      }); 
-      return total; 
+      return transactions
+        .filter(t => new Date(t.date).toDateString() === checkDate)
+        .reduce((sum, t) => sum + t.amount, 0);
   };
 
   const calculateTotalRevenue = () => {
-      let total = 0;
-      allUsers.forEach(user => {
-          if (user.subscription && user.subscription.status === 'Active') total += (user.subscription.paidAmount || user.subscription.price);
-          if (user.ptSubscription && user.ptSubscription.status === 'Active') total += (user.ptSubscription.paidAmount || user.ptSubscription.price);
-      });
-      return total;
+      return transactions.reduce((sum, t) => sum + t.amount, 0);
   };
 
   const handleSaveUserDetails = () => { 
@@ -435,31 +425,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleCreateOrUpdatePackage = () => { 
       if (!newPackage.name || !newPackage.price || !newPackage.duration) return alert("Vui lòng nhập đủ thông tin: Tên, Giá, Số tháng"); 
       
+      const pkgData: PackageItem = {
+          id: editingPackageId || Date.now().toString(),
+          categoryId: newPackage.categoryId,
+          name: newPackage.name,
+          price: parseInt(newPackage.price.toString()),
+          image: newPackage.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300',
+          description: newPackage.description,
+          duration: parseInt(newPackage.duration.toString())
+      };
+
       if (editingPackageId) {
           // Update
-          const updatedPackages = packages.map(p => p.id === editingPackageId ? {
-              ...p,
-              name: newPackage.name,
-              price: parseInt(newPackage.price.toString()),
-              image: newPackage.image || p.image,
-              description: newPackage.description,
-              duration: parseInt(newPackage.duration)
-          } : p);
+          const updatedPackages = packages.map(p => p.id === editingPackageId ? pkgData : p);
           setPackages(updatedPackages);
           setEditingPackageId(null);
       } else {
           // Create
-          const pkg: PackageItem = { 
-              id: Date.now().toString(), 
-              name: newPackage.name, 
-              price: parseInt(newPackage.price.toString()), 
-              image: newPackage.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300',
-              description: newPackage.description,
-              duration: parseInt(newPackage.duration)
-          }; 
-          setPackages([...packages, pkg]); 
+          setPackages([...packages, pkgData]); 
       }
-      setNewPackage({ name: '', price: '', image: '', description: '', duration: '' }); 
+      setNewPackage({ name: '', price: '', image: '', description: '', duration: '', categoryId: 'gym' }); 
       alert(editingPackageId ? "Cập nhật gói thành công" : "Thêm gói tập thành công"); 
   };
 
@@ -469,7 +454,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           price: pkg.price.toString(),
           image: pkg.image,
           description: pkg.description || '',
-          duration: pkg.duration.toString()
+          duration: pkg.duration.toString(),
+          categoryId: pkg.categoryId
       });
       setEditingPackageId(pkg.id);
   };
@@ -667,7 +653,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                <button onClick={(e) => { e.stopPropagation(); setShowAdminToast(false); }} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3"/></button>
             </div>
             <div className="space-y-1">
-                {pendingAccounts.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingAccounts.length} đăng ký tài khoản mới</p>}
                 {pendingUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingUsers.length} gói tập Gym mới</p>}
                 {pendingPTUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingPTUsers.length} đăng ký PT mới</p>}
                 {pendingBookings.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingBookings.length} lịch đặt PT</p>}
@@ -810,24 +795,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {/* 1. Pending Approvals */}
                   {showPopup === 'pending_approvals' && (
                       <div className="space-y-6">
-                          {/* Pending Accounts */}
-                          {pendingAccounts.length > 0 && (
-                             <div>
-                                <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Tài Khoản Mới ({pendingAccounts.length})</h4>
-                                <div className="space-y-2">
-                                   {pendingAccounts.map(u => (
-                                      <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex justify-between items-center">
-                                         <div>
-                                            <p className="font-bold text-gray-800 text-sm">{u.realName || u.name}</p>
-                                            <p className="text-xs text-gray-500 font-medium">{u.phone}</p>
-                                         </div>
-                                         <button onClick={() => handleApproveAccount(u.phone)} className="bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-blue-200">Duyệt TK</button>
-                                      </div>
-                                   ))}
-                                </div>
-                             </div>
-                          )}
-
                           {/* Bookings */}
                           {pendingBookings.length > 0 && (
                              <div>
@@ -952,11 +919,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </div>
                               <input value={editingRealName} onChange={e => setEditingRealName(e.target.value)} className="text-center font-black text-lg bg-transparent border-b border-gray-200 focus:border-orange-500 outline-none pb-1" placeholder="Tên thật"/>
                               <p className="text-xs font-bold text-gray-400 mt-1">{selectedUser.phone}</p>
-                              <div className="flex justify-center mt-1">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedUser.accountStatus === 'Active' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-                                      {selectedUser.accountStatus === 'Active' ? 'Active' : 'Pending Approval'}
-                                  </span>
-                              </div>
                               
                               <div className="grid grid-cols-2 gap-2 w-full mt-4">
                                   <button onClick={() => setShowPopup('chat')} className="bg-blue-50 text-blue-600 py-2 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-1"><MessageSquare className="w-4 h-4"/> Chat</button>
@@ -1005,6 +967,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <div className="bg-white p-6 rounded-2xl text-center shadow-sm border border-blue-100">
                               <p className="text-gray-400 text-xs font-black uppercase tracking-widest mb-2">Tổng doanh thu toàn thời gian</p>
                               <p className="text-3xl font-black text-blue-500">{calculateTotalRevenue().toLocaleString()}đ</p>
+                          </div>
+                          {/* Transaction List for the Day */}
+                          <div className="space-y-2">
+                              {transactions
+                                .filter(t => new Date(t.date).toDateString() === new Date(revenueDate).toDateString())
+                                .map(t => (
+                                  <div key={t.id} className="bg-white p-3 rounded-xl flex justify-between items-center text-xs">
+                                      <div>
+                                          <p className="font-bold text-gray-800">{t.userName}</p>
+                                          <p className="text-gray-500">{t.packageName} • {t.method}</p>
+                                      </div>
+                                      <span className="font-black text-green-600">+{t.amount.toLocaleString()}đ</span>
+                                  </div>
+                              ))}
                           </div>
                       </div>
                   )}
@@ -1058,6 +1034,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {showPopup === 'config_hero' && (
                       <div className="space-y-4">
                           <div>
+                              <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Logo App (Hiển thị Home)</label>
+                              <ImageUpload currentImage={configHero.appLogo} onImageUploaded={(url) => setConfigHero({...configHero, appLogo: url})} aspect="aspect-square" className="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-gray-200"/>
+                          </div>
+                          <div>
                               <label className="text-xs font-bold text-gray-400 uppercase">Tiêu đề lớn</label>
                               <textarea value={configHero.title} onChange={e => setConfigHero({...configHero, title: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
                           </div>
@@ -1087,22 +1067,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                            <div className="bg-white p-4 rounded-2xl shadow-sm">
                                <h4 className="font-black text-gray-400 text-xs uppercase mb-3">{editingPackageId ? 'Sửa Gói' : 'Thêm Gói Mới'}</h4>
                                <div className="space-y-3">
+                                   <div className="flex gap-2 mb-2">
+                                       <button onClick={() => setNewPackage({...newPackage, categoryId: 'gym'})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase border ${newPackage.categoryId === 'gym' ? 'bg-orange-50 border-[#FF6B00] text-[#FF6B00]' : 'border-gray-200 text-gray-400'}`}>Gói Gym</button>
+                                       <button onClick={() => setNewPackage({...newPackage, categoryId: 'groupx'})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase border ${newPackage.categoryId === 'groupx' ? 'bg-purple-50 border-purple-500 text-purple-500' : 'border-gray-200 text-gray-400'}`}>Gói Group X</button>
+                                   </div>
                                    <input value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} placeholder="Tên gói (VD: 1 Tháng)" className="w-full bg-gray-50 px-3 py-2 rounded-xl text-sm font-bold"/>
                                    <input type="number" value={newPackage.price} onChange={e => setNewPackage({...newPackage, price: e.target.value})} placeholder="Giá tiền" className="w-full bg-gray-50 px-3 py-2 rounded-xl text-sm font-bold"/>
                                    <input type="number" value={newPackage.duration} onChange={e => setNewPackage({...newPackage, duration: e.target.value})} placeholder="Số tháng (VD: 1, 3, 6)" className="w-full bg-gray-50 px-3 py-2 rounded-xl text-sm font-bold"/>
                                    <input value={newPackage.description} onChange={e => setNewPackage({...newPackage, description: e.target.value})} placeholder="Mô tả ngắn" className="w-full bg-gray-50 px-3 py-2 rounded-xl text-sm font-bold"/>
-                                   <ImageUpload currentImage={newPackage.image} onImageUploaded={(url) => setNewPackage({...newPackage, image: url})} label="Ảnh Gói" aspect="h-48" className="rounded-xl overflow-hidden"/>
+                                   <div className="border-2 border-dashed border-gray-200 rounded-xl p-2 relative">
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1 flex items-center gap-1"><Crop className="w-3 h-3"/> Ảnh gói (Có thể chỉnh sửa bố cục)</p>
+                                      <ImageUpload currentImage={newPackage.image} onImageUploaded={(url) => setNewPackage({...newPackage, image: url})} label="" aspect="aspect-video" className="rounded-xl overflow-hidden"/>
+                                   </div>
                                    
                                    <div className="flex gap-2">
                                        <button onClick={handleCreateOrUpdatePackage} className="flex-1 bg-green-500 text-white py-3 rounded-xl font-black uppercase text-xs shadow-md">{editingPackageId ? 'Cập Nhật' : 'Thêm Gói'}</button>
-                                       {editingPackageId && <button onClick={() => { setEditingPackageId(null); setNewPackage({name: '', price: '', image: '', description: '', duration: ''}); }} className="bg-gray-200 text-gray-600 px-4 rounded-xl font-bold uppercase text-xs">Hủy</button>}
+                                       {editingPackageId && <button onClick={() => { setEditingPackageId(null); setNewPackage({name: '', price: '', image: '', description: '', duration: '', categoryId: 'gym'}); }} className="bg-gray-200 text-gray-600 px-4 rounded-xl font-bold uppercase text-xs">Hủy</button>}
                                    </div>
                                </div>
                            </div>
                            
                            <div className="space-y-2">
                                {packages.map(p => (
-                                   <div key={p.id} className="bg-white p-3 rounded-xl flex gap-3 items-center shadow-sm">
+                                   <div key={p.id} className="bg-white p-3 rounded-xl flex gap-3 items-center shadow-sm relative overflow-hidden">
+                                       <div className={`absolute left-0 top-0 bottom-0 w-1 ${p.categoryId === 'gym' ? 'bg-[#FF6B00]' : 'bg-purple-500'}`}></div>
                                        <img src={p.image} className="w-12 h-12 rounded-lg object-cover bg-gray-100"/>
                                        <div className="flex-1">
                                            <p className="font-bold text-sm text-gray-800">{p.name}</p>

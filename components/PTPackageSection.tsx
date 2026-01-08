@@ -113,6 +113,7 @@ const PTPackageSection: React.FC<PTPackageSectionProps> = ({ ptPackages, user, o
          type="pt"
          ptPackage={selectedPT || undefined}
          vouchers={vouchers}
+         user={user}
          onConfirm={(data) => {
              if (selectedPT) onRegisterPT(selectedPT, data.price, data.voucherCode);
              setSelectedPT(null);

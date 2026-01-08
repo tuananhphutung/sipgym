@@ -134,6 +134,7 @@ const ActionCard: React.FC<ActionCardProps> = ({
         vouchers={vouchers}
         userReferralDiscount={referralDiscount}
         userDiscountReason={discountReason}
+        user={user}
         onConfirm={(data) => {
             onUpdateSubscription(data.packageName, data.months, data.price, data.voucherCode);
         }}

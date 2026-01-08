@@ -3,8 +3,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
-import ActionCard from '../components/ActionCard';
 import QuickNav from '../components/QuickNav';
+import PackageSection from '../components/PackageSection'; // New Component
 import PTPackageSection from '../components/PTPackageSection';
 import WeatherWidget from '../components/WeatherWidget';
 import { UserPlus, ShieldCheck } from 'lucide-react';
@@ -18,16 +18,16 @@ interface HomeProps {
   packages: PackageItem[];
   ptPackages: PTPackage[]; 
   vouchers: VoucherItem[]; 
+  appLogo?: string;
   heroImage?: string; 
   heroTitle?: string;
   heroSubtitle?: string;
   heroOverlayText?: string;
   heroOverlaySub?: string;
-  onOpenAuth: () => void;
   onLogout: () => void;
-  onUpdateSubscription: (packageName: string, months: number, price: number, voucherCode?: string) => void;
+  onUpdateSubscription: (packageName: string, months: number, price: number, method: 'Cash'|'Transfer', voucherCode?: string) => void;
   onUpdateUser: (users: UserProfile[]) => void;
-  onRegisterPT: (pkg: PTPackage, paidAmount: number, voucherCode?: string) => void;
+  onRegisterPT: (pkg: PTPackage, paidAmount: number, method: 'Cash'|'Transfer', voucherCode?: string) => void;
   allUsers: UserProfile[];
   bookings?: Booking[];
   onUpdateBookings?: (bookings: Booking[]) => void;
@@ -35,8 +35,8 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ 
   user, promotions, trainers, programs, packages, ptPackages, vouchers, 
-  heroImage, heroTitle, heroSubtitle, heroOverlayText, heroOverlaySub,
-  onOpenAuth, onLogout, onUpdateSubscription, onUpdateUser, onRegisterPT, allUsers,
+  appLogo, heroImage, heroTitle, heroSubtitle, heroOverlayText, heroOverlaySub,
+  onLogout, onUpdateSubscription, onUpdateUser, onRegisterPT, allUsers,
   bookings, onUpdateBookings
 }) => {
   const navigate = useNavigate();
@@ -56,6 +56,14 @@ const Home: React.FC<HomeProps> = ({
 
   return (
     <div className="animate-in fade-in duration-500 relative pb-10">
+      
+      {/* Top Logo Area */}
+      <div className="flex justify-center pt-4 pb-2">
+         <div className="w-16 h-16 bg-white rounded-full shadow-md flex items-center justify-center border-2 border-orange-50">
+            <img src={appLogo} className="w-12 h-12 object-contain" alt="Logo" />
+         </div>
+      </div>
+
       <Header user={user} onLogout={onLogout} onUpdateUser={onUpdateUser} allUsers={allUsers} />
       
       {/* Weather Widget Section - Compact */}
@@ -72,7 +80,7 @@ const Home: React.FC<HomeProps> = ({
       />
       
       {/* Referral Button Block */}
-      <div className="px-6 mt-4">
+      <div className="px-4 mt-4">
          <button 
            onClick={handleShare}
            className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white p-4 rounded-2xl shadow-lg shadow-blue-100 flex items-center justify-between group active:scale-95 transition-all duration-200 hover:shadow-xl hover:brightness-110"
@@ -93,7 +101,7 @@ const Home: React.FC<HomeProps> = ({
       {promotions.length > 0 && (
         <div className="px-5 mt-6 overflow-x-auto no-scrollbar flex gap-4 pb-2">
            {promotions.map(promo => (
-             <div key={promo.id} className="min-w-[280px] h-32 bg-orange-600 rounded-[32px] relative overflow-hidden shadow-lg shadow-orange-100 shrink-0 transform transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer">
+             <div key={promo.id} className="min-w-[280px] h-32 bg-orange-600 rounded-[20px] relative overflow-hidden shadow-lg shadow-orange-100 shrink-0 transform transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer">
                 <img src={promo.image} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="promo" />
                 <div className="absolute inset-0 p-5 flex flex-col justify-end">
                    <p className="text-white font-black uppercase text-sm italic drop-shadow-md">{promo.title}</p>
@@ -104,27 +112,26 @@ const Home: React.FC<HomeProps> = ({
         </div>
       )}
 
-      <ActionCard 
-        isLoggedIn={!!user} 
-        onOpenAuth={onOpenAuth} 
-        subscription={user?.subscription || null}
-        onUpdateSubscription={onUpdateSubscription}
-        packages={packages}
-        user={user}
+      {/* Main Packages Display - Directly on Home */}
+      <PackageSection 
+         packages={packages} 
+         onUpdateSubscription={onUpdateSubscription}
+         user={user}
+         vouchers={vouchers}
       />
+
       <QuickNav 
          trainers={trainers} 
          user={user}
          bookings={bookings}
          onUpdateBookings={onUpdateBookings}
-         onOpenAuth={onOpenAuth}
       />
       
       <PTPackageSection 
         ptPackages={ptPackages} 
         user={user}
         onRegisterPT={onRegisterPT}
-        onOpenAuth={onOpenAuth}
+        onOpenAuth={() => {}} // Not needed as flow forces login first
       />
       
       {/* Temporary Admin Login Button */}
