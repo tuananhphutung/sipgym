@@ -59,7 +59,7 @@ export interface Subscription {
   price: number;
   paidAmount: number; 
   paymentMethod?: 'Cash' | 'Transfer';
-  voucherCode?: string;
+  voucherCode?: string | null;
   status: 'Pending' | 'Active' | 'Expired' | 'Rejected' | 'Pending Preservation' | 'Preserved';
   packageImage?: string;
 }
@@ -436,7 +436,7 @@ const AppContent: React.FC = () => {
       status: 'Pending', 
       packageImage: pkg?.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300',
       paymentMethod: method,
-      voucherCode: voucherCode
+      voucherCode: voucherCode || null // Sanitized voucherCode
     };
     let updatedUser = { ...currentUser, subscription: newSubscription };
     

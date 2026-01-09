@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, CheckCircle2, Copy, Smartphone, Wallet, ArrowRight, CreditCard, Ticket, Check, Clock } from 'lucide-react';
+import { X, CheckCircle2, Copy, Wallet, ArrowRight, CreditCard, Ticket, Check, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { PackageItem, PTPackage, VoucherItem, UserProfile } from '../App';
 
 interface PaymentModalProps {
@@ -9,7 +10,7 @@ interface PaymentModalProps {
   type: 'gym' | 'pt';
   packages?: PackageItem[]; 
   ptPackage?: PTPackage; 
-  selectedPackageInit?: PackageItem | null; // For direct package click
+  selectedPackageInit?: PackageItem | null; 
   
   vouchers: VoucherItem[];
   user: UserProfile | null;
@@ -24,6 +25,7 @@ const QR_IMAGE_URL = "https://phukienlimousine.vn/wp-content/uploads/2025/12/z63
 const PaymentModal: React.FC<PaymentModalProps> = ({ 
   isOpen, onClose, type, packages = [], ptPackage, selectedPackageInit, vouchers, user, userReferralDiscount = 0, userDiscountReason, onConfirm 
 }) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState<'voucher' | 'payment_method' | 'transfer_info' | 'success'>('voucher');
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(selectedPackageInit || null);
   
@@ -77,22 +79,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       }
   };
 
-  const handleSaveVoucher = (code: string) => {
-      // Logic to save voucher to user profile would go here (requires lifting state up fully, but for UI sim:)
-      alert("Đã lưu mã vào kho Voucher của bạn!");
-  };
-
   const proceedToPayment = () => {
       setStep('payment_method');
   };
 
   const confirmPaymentMethod = () => {
-      if (paymentMethod === 'Cash') {
-          // Finish immediately for Cash
-          finish();
-      } else {
-          setStep('transfer_info');
-      }
+      // Trigger update immediately
+      finish();
   };
 
   const finish = () => {
@@ -103,7 +96,23 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           method: paymentMethod,
           voucherCode: appliedVoucher?.code
       });
-      setStep('success');
+      
+      if (paymentMethod === 'Cash') {
+          setStep('success');
+      } else {
+          setStep('transfer_info'); // Show QR code first
+      }
+  };
+  
+  const handleCompleteTransfer = () => {
+      // User says they transferred
+      navigate('/'); // Go back home
+      onClose();
+  };
+
+  const handleCloseSuccess = () => {
+      navigate('/');
+      onClose();
   };
 
   const copyToClipboard = (text: string) => {
@@ -139,7 +148,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
                         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100">
                              <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 shrink-0">
-                                 <img src={type === 'gym' ? selectedPackage?.image : ptPackage?.image} className="w-full h-full object-cover"/>
+                                 <img src={type === 'gym' ? selectedPackage?.image : ptPackage?.image} className="w-full h-full object-cover" alt="pkg"/>
                              </div>
                              <div>
                                  <p className="font-black text-gray-800 text-sm">{type === 'gym' ? selectedPackage?.name : ptPackage?.name}</p>
@@ -186,7 +195,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                             <button onClick={() => handleApplyVoucher(voucherCode)} className="bg-blue-500 text-white px-4 rounded-xl font-bold text-xs uppercase shadow-md active:scale-95 transition-transform">Áp Dụng</button>
                         </div>
 
-                        {/* Saved Vouchers (Simulated) */}
+                        {/* Saved Vouchers */}
                         <p className="text-[10px] font-bold text-gray-400 mb-2 ml-1">Kho Voucher của bạn:</p>
                         <div className="flex flex-col gap-2">
                             {vouchers.filter(v => (v.type === 'Gift' || v.type.toLowerCase() === type || (v.type === 'Gym' && type === 'gym'))).map(v => (
@@ -250,7 +259,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="space-y-6">
                     <div className="bg-white border-2 border-[#FF6B00] rounded-3xl p-4 text-center relative overflow-hidden shadow-sm">
                         <div className="absolute top-0 left-0 bg-[#FF6B00] text-white px-3 py-1 rounded-br-xl text-[10px] font-bold">Quét mã QR</div>
-                        <img src={QR_IMAGE_URL} alt="VietQR" className="w-48 h-48 mx-auto object-contain my-2" />
+                        <div className="w-full aspect-square bg-gray-100 rounded-xl mb-2 overflow-hidden">
+                            <img src={QR_IMAGE_URL} alt="VietQR" className="w-full h-full object-contain" />
+                        </div>
                         <p className="font-black text-2xl text-gray-800">{calculation.finalPrice.toLocaleString()}đ</p>
                         <div className="bg-gray-100 p-2 rounded-xl mt-2 flex justify-between items-center px-4">
                             <span className="text-xs text-gray-500 font-medium">Nội dung CK: <span className="text-gray-900 font-bold select-all">T{Date.now().toString().slice(-6)}</span></span>
@@ -266,13 +277,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                         </div>
                     </div>
                     
-                    <button onClick={finish} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                    <button onClick={handleCompleteTransfer} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black uppercase shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-transform">
                         <Check className="w-5 h-5"/> Hoàn Tất Thanh Toán
                     </button>
                 </div>
             )}
 
-            {/* STEP 4: SUCCESS */}
+            {/* STEP 4: SUCCESS (Cash only) */}
             {step === 'success' && (
                 <div className="text-center py-8">
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
@@ -280,15 +291,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                     <h3 className="text-xl font-black text-gray-800 uppercase italic mb-2">Đã Gửi Yêu Cầu!</h3>
                     <p className="text-sm text-gray-500 px-4 leading-relaxed mb-6">
-                       {paymentMethod === 'Cash' 
-                         ? "Bạn vui lòng thanh toán tại quầy. Gói tập đang ở trạng thái 'Chờ duyệt'." 
-                         : "Hệ thống đã ghi nhận thông tin chuyển khoản. Gói tập đang ở trạng thái 'Chờ duyệt'."}
+                       Bạn vui lòng thanh toán tại quầy. Gói tập đang ở trạng thái 'Chờ duyệt'.
                     </p>
                     <div className="bg-gray-100 p-3 rounded-xl inline-flex items-center gap-2">
                         <Clock className="w-4 h-4 text-gray-500" />
                         <span className="text-xs font-bold text-gray-600 uppercase">Trạng thái: Chờ Admin Duyệt</span>
                     </div>
-                    <button onClick={onClose} className="w-full mt-8 bg-[#00AEEF] text-white px-8 py-4 rounded-2xl font-black uppercase text-sm shadow-lg shadow-blue-200 active:scale-95 transition-transform">Về Trang Chủ</button>
+                    <button onClick={handleCloseSuccess} className="w-full mt-8 bg-[#00AEEF] text-white px-8 py-4 rounded-2xl font-black uppercase text-sm shadow-lg shadow-blue-200 active:scale-95 transition-transform">Về Trang Chủ</button>
                 </div>
             )}
         </div>

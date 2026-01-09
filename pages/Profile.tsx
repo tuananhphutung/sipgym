@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit2, Package, PlusCircle, RefreshCw, ClipboardList, LogOut, ShieldCheck, X, Camera, PauseCircle, Users, Lock, ScanFace, UserCheck, Bell, ChevronRight, Settings } from 'lucide-react';
 import { UserProfile, PackageItem, VoucherItem } from '../App';
 import PaymentModal from '../components/PaymentModal';
+import SubscriptionModal from '../components/SubscriptionModal'; // Reusing as selector
 import ImageUpload from '../components/ImageUpload';
 import { dbService } from '../services/firebase';
 
@@ -18,7 +19,9 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateUser, allUsers, packages, vouchers }) => {
   const navigate = useNavigate();
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
+  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   // Settings Modals
@@ -221,13 +224,13 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
              ) : (
                  <div className="text-center py-4 bg-gray-50 rounded-2xl">
                     <p className="text-xs font-bold text-gray-400 mb-2">Bạn chưa đăng ký gói tập nào</p>
-                    <button onClick={() => setIsPaymentModalOpen(true)} className="bg-[#FF6B00] text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-lg shadow-orange-200 active:scale-95 transition-all">Đăng ký ngay</button>
+                    <button onClick={() => setIsSelectorOpen(true)} className="bg-[#FF6B00] text-white px-4 py-2 rounded-xl text-xs font-black uppercase shadow-lg shadow-orange-200 active:scale-95 transition-all">Đăng ký ngay</button>
                  </div>
              )}
              
              {/* Actions */}
              <div className="grid grid-cols-2 gap-3">
-                 <button onClick={() => setIsPaymentModalOpen(true)} className="bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform hover:bg-blue-100"><PlusCircle className="w-5 h-5"/> Mua thêm gói</button>
+                 <button onClick={() => setIsSelectorOpen(true)} className="bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform hover:bg-blue-100"><PlusCircle className="w-5 h-5"/> Mua thêm gói</button>
                  <button onClick={() => navigate('/schedule')} className="bg-green-50 text-green-600 py-3 rounded-2xl text-[10px] font-black uppercase flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform hover:bg-green-100"><ClipboardList className="w-5 h-5"/> Lịch sử tập</button>
              </div>
           </div>
@@ -302,17 +305,28 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
         </div>
       </div>
 
+      <SubscriptionModal 
+         isOpen={isSelectorOpen}
+         onClose={() => setIsSelectorOpen(false)}
+         packages={packages}
+         onSelectPackage={(pkg) => {
+             setSelectedPackage(pkg);
+             setIsSelectorOpen(false);
+         }}
+      />
+
       <PaymentModal 
-         isOpen={isPaymentModalOpen} 
-         onClose={() => setIsPaymentModalOpen(false)} 
+         isOpen={!!selectedPackage} 
+         onClose={() => setSelectedPackage(null)} 
          type="gym"
+         selectedPackageInit={selectedPackage}
          packages={packages} 
          vouchers={vouchers}
          userReferralDiscount={referralDiscount}
          userDiscountReason={discountReason}
          user={user}
          onConfirm={(data) => {
-            onUpdateSubscription(data.packageName, data.months, data.price, data.voucherCode);
+            onUpdateSubscription(data.packageName, data.months, data.price, data.method, data.voucherCode);
          }}
       />
 
