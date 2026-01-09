@@ -206,6 +206,7 @@ const AppContent: React.FC = () => {
   // App Settings State
   const [appLogo, setAppLogo] = useState<string>('https://phukienlimousine.vn/wp-content/uploads/2025/12/LOGO_SIP_GYM_pages-to-jpg-0001-removebg-preview.png');
   const [heroImage, setHeroImage] = useState<string>('https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600');
+  const [heroVideo, setHeroVideo] = useState<string>(''); // New Video State
   const [heroTitle, setHeroTitle] = useState<string>('CÂU LẠC\nBỘ\nGYM');
   const [heroSubtitle, setHeroSubtitle] = useState<string>('GYM CHO MỌI NGƯỜI');
   const [heroOverlayText, setHeroOverlayText] = useState<string>('THAY ĐỔI BẢN THÂN');
@@ -337,6 +338,7 @@ const AppContent: React.FC = () => {
         if (data) {
             if (data.appLogo) setAppLogo(data.appLogo);
             if (data.heroImage) setHeroImage(data.heroImage);
+            if (data.heroVideo) setHeroVideo(data.heroVideo);
             if (data.heroTitle) setHeroTitle(data.heroTitle);
             if (data.heroSubtitle) setHeroSubtitle(data.heroSubtitle);
             if (data.heroOverlayText) setHeroOverlayText(data.heroOverlayText);
@@ -397,9 +399,10 @@ const AppContent: React.FC = () => {
       dbService.saveAll('bookings', newBookings);
   };
   
-  const syncAppConfig = (config: { appLogo: string, heroImage: string, heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string }) => {
+  const syncAppConfig = (config: { appLogo: string, heroImage: string, heroVideo?: string, heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string }) => {
       setAppLogo(config.appLogo);
       setHeroImage(config.heroImage);
+      if(config.heroVideo) setHeroVideo(config.heroVideo);
       setHeroTitle(config.heroTitle);
       setHeroSubtitle(config.heroSubtitle);
       if(config.heroOverlayText) setHeroOverlayText(config.heroOverlayText);
@@ -534,6 +537,7 @@ const AppContent: React.FC = () => {
                   vouchers={vouchers}
                   appLogo={appLogo}
                   heroImage={heroImage}
+                  heroVideo={heroVideo}
                   heroTitle={heroTitle}
                   heroSubtitle={heroSubtitle}
                   heroOverlayText={heroOverlayText}

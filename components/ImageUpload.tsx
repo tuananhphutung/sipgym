@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Loader2 } from 'lucide-react';
+import { Camera, Upload, Loader2, PlayCircle } from 'lucide-react';
 import { uploadToCloudinary } from '../services/cloudinary';
 
 interface ImageUploadProps {
@@ -9,6 +9,7 @@ interface ImageUploadProps {
   className?: string;
   label?: string;
   aspect?: 'aspect-video' | 'aspect-square' | 'h-48'; // Thêm prop để kiểm soát tỉ lệ
+  accept?: string; // New prop to control file types
 }
 
 const ImageUpload: React.FC<ImageUploadProps> = ({ 
@@ -16,7 +17,8 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   onImageUploaded, 
   className = "", 
   label = "Ảnh",
-  aspect = "aspect-video" // Mặc định là hình chữ nhật 16:9 (dùng cho banner, gói tập)
+  aspect = "aspect-video",
+  accept = "image/*"
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +36,11 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     }
   };
 
+  const isVideo = (url?: string | null) => {
+      if (!url) return false;
+      return url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov') || url.includes('/video/upload');
+  };
+
   return (
     <div className={`w-full ${className}`}>
       {label && <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block ml-1">{label}</label>}
@@ -43,7 +50,15 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       >
         {currentImage ? (
           <>
-            <img src={currentImage} alt="Preview" className="w-full h-full object-cover absolute inset-0" />
+            {isVideo(currentImage) ? (
+                <div className="relative w-full h-full bg-black flex items-center justify-center">
+                    <video src={currentImage} className="w-full h-full object-cover opacity-60" muted playsInline />
+                    <PlayCircle className="absolute w-12 h-12 text-white/80" />
+                </div>
+            ) : (
+                <img src={currentImage} alt="Preview" className="w-full h-full object-cover absolute inset-0" />
+            )}
+            
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                <Camera className="text-white w-8 h-8 drop-shadow-lg" />
             </div>
@@ -55,7 +70,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         ) : (
           <div className="flex flex-col items-center text-slate-400 p-4 text-center">
              <Upload className="w-8 h-8 mb-2 text-slate-300" />
-             <span className="text-[10px] font-bold uppercase tracking-wider">Chạm để tải ảnh</span>
+             <span className="text-[10px] font-bold uppercase tracking-wider">Chạm để tải lên</span>
           </div>
         )}
 
@@ -72,7 +87,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         type="file" 
         ref={fileInputRef} 
         onChange={handleFileChange} 
-        accept="image/*" 
+        accept={accept} 
         className="hidden" 
       />
     </div>

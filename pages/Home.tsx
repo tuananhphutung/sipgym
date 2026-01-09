@@ -20,6 +20,7 @@ interface HomeProps {
   vouchers: VoucherItem[]; 
   appLogo?: string;
   heroImage?: string; 
+  heroVideo?: string; // New Prop
   heroTitle?: string;
   heroSubtitle?: string;
   heroOverlayText?: string;
@@ -35,7 +36,7 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ 
   user, promotions, trainers, programs, packages, ptPackages, vouchers, 
-  appLogo, heroImage, heroTitle, heroSubtitle, heroOverlayText, heroOverlaySub,
+  appLogo, heroImage, heroVideo, heroTitle, heroSubtitle, heroOverlayText, heroOverlaySub,
   onLogout, onUpdateSubscription, onUpdateUser, onRegisterPT, allUsers,
   bookings, onUpdateBookings
 }) => {
@@ -73,6 +74,7 @@ const Home: React.FC<HomeProps> = ({
 
       <Hero 
         image={heroImage} 
+        video={heroVideo}
         title={heroTitle} 
         subtitle={heroSubtitle}
         overlayText={heroOverlayText}
