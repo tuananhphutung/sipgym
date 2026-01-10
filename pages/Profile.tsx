@@ -1,12 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, Package, PlusCircle, RefreshCw, ClipboardList, LogOut, ShieldCheck, X, Camera, PauseCircle, Users, Lock, ScanFace, UserCheck, Bell, ChevronRight, Settings } from 'lucide-react';
+import { ArrowLeft, Edit2, Package, PlusCircle, RefreshCw, ClipboardList, LogOut, ShieldCheck, X, Camera, PauseCircle, Users, Lock, ScanFace, UserCheck, Bell, ChevronRight, Settings, QrCode } from 'lucide-react';
 import { UserProfile, PackageItem, VoucherItem } from '../App';
 import PaymentModal from '../components/PaymentModal';
 import SubscriptionModal from '../components/SubscriptionModal'; // Reusing as selector
 import ImageUpload from '../components/ImageUpload';
 import { dbService } from '../services/firebase';
+import QRCode from 'react-qr-code';
 
 interface ProfileProps {
   user: UserProfile | null;
@@ -23,6 +24,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   
   // Settings Modals
   const [activeSetting, setActiveSetting] = useState<'password' | 'face' | 'referral' | null>(null);
@@ -181,11 +183,25 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
     discountReason = "Quà thành viên mới";
   }
 
+  // Identity Data for QR
+  const identityData = {
+      type: 'user_identity',
+      phone: user.phone,
+      name: user.name,
+      realName: user.realName,
+      gender: user.gender,
+      subscription: user.subscription?.name || 'None',
+      status: user.subscription?.status || 'Inactive',
+      expiry: user.subscription?.expireDate ? new Date(user.subscription.expireDate).toLocaleDateString('vi-VN') : 'N/A'
+  };
+
   return (
     <div className="bg-[#F7FAFC] min-h-screen animate-in slide-in-from-right duration-300 pb-24 w-full">
       {/* Top Banner */}
       <div className="bg-[#FF6B00] pt-12 pb-12 relative overflow-hidden rounded-b-[0px] shadow-lg shadow-orange-200/50">
         <button onClick={() => navigate('/')} className="absolute top-6 left-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white active:scale-95 transition-all z-20"><ArrowLeft className="w-6 h-6" /></button>
+        <button onClick={() => setIsQrModalOpen(true)} className="absolute top-6 right-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white active:scale-95 transition-all z-20"><QrCode className="w-6 h-6" /></button>
+        
         <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-[-20px] left-10 w-32 h-32 bg-yellow-400/20 rounded-full blur-2xl"></div>
         
@@ -257,6 +273,15 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
            <div className="p-4 border-b border-gray-50 bg-gray-50/50"><h2 className="text-gray-800 font-black text-sm uppercase flex items-center gap-2"><Settings className="w-5 h-5 text-gray-400" /> Cài đặt & Tài khoản</h2></div>
            
            <div className="divide-y divide-gray-50">
+               {/* Identity QR Button in List */}
+               <button onClick={() => setIsQrModalOpen(true)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                     <div className="w-9 h-9 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center"><QrCode className="w-4 h-4"/></div>
+                     <span className="text-sm font-bold text-gray-700">Mã Định Danh</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+               </button>
+
                {/* Referral */}
                <button onClick={() => setActiveSetting('referral')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors">
                   <div className="flex items-center gap-3">
@@ -326,7 +351,8 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
          userDiscountReason={discountReason}
          user={user}
          onConfirm={(data) => {
-            onUpdateSubscription(data.packageName, data.months, data.price, data.method, data.voucherCode);
+             onUpdateSubscription(data.packageName, data.months, data.price, data.method, data.voucherCode);
+             setSelectedPackage(null);
          }}
       />
 
@@ -353,6 +379,31 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
                 <button onClick={handleSaveProfile} className="w-full bg-[#FF6B00] text-white py-3 rounded-xl font-black uppercase shadow-lg shadow-orange-200 active:scale-95 transition-all mt-2">Lưu Thay Đổi</button>
              </div>
           </div>
+        </div>
+      )}
+
+      {/* QR Identity Modal */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in duration-300">
+           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsQrModalOpen(false)} />
+           <div className="relative w-full max-w-sm bg-white rounded-[40px] p-8 shadow-2xl animate-in zoom-in-95 flex flex-col items-center text-center overflow-hidden">
+               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF6B00] to-yellow-400"></div>
+               <button onClick={() => setIsQrModalOpen(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X className="w-5 h-5 text-gray-500"/></button>
+               
+               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-orange-100 mb-4 shadow-lg">
+                   {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.phone}`} className="w-full h-full object-cover" />}
+               </div>
+               <h3 className="text-xl font-black text-gray-800 uppercase italic mb-1">{user.name}</h3>
+               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">{user.phone}</p>
+               
+               <div className="bg-white p-4 rounded-3xl shadow-inner border border-gray-100 mb-4">
+                   <div className="bg-white p-2">
+                       <QRCode value={JSON.stringify(identityData)} size={200} viewBox={`0 0 256 256`} style={{ height: "auto", maxWidth: "100%", width: "100%" }} />
+                   </div>
+               </div>
+               
+               <p className="text-[10px] text-gray-400 font-medium">Đưa mã này cho nhân viên để check-in hoặc xác thực.</p>
+           </div>
         </div>
       )}
 

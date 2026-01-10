@@ -58,10 +58,23 @@ const Home: React.FC<HomeProps> = ({
   return (
     <div className="animate-in fade-in duration-500 relative pb-10">
       
-      {/* Top Logo Area */}
-      <div className="flex justify-center pt-4 pb-2">
-         <div className="w-16 h-16 bg-white rounded-full shadow-md flex items-center justify-center border-2 border-orange-50">
-            <img src={appLogo} className="w-12 h-12 object-contain" alt="Logo" />
+      {/* Top Logo & Slogan Area - Restored & Styled */}
+      <div className="flex flex-col items-center justify-center pt-8 pb-4">
+         <div className="w-20 h-20 bg-white rounded-full shadow-xl flex items-center justify-center border-4 border-orange-50 mb-3 relative z-10 transform hover:scale-105 transition-transform duration-300">
+            <img src={appLogo} className="w-14 h-14 object-contain" alt="Logo" />
+         </div>
+         
+         <div className="text-center space-y-1 animate-in slide-in-from-top-2 duration-700">
+            {heroTitle && (
+                <h1 className="text-2xl font-[900] text-gray-800 uppercase italic tracking-tighter leading-none whitespace-pre-line drop-shadow-sm">
+                    {heroTitle}
+                </h1>
+            )}
+            {heroSubtitle && (
+                <p className="text-[10px] font-bold text-[#FF6B00] tracking-[0.3em] uppercase opacity-90 mt-1.5">
+                    {heroSubtitle}
+                </p>
+            )}
          </div>
       </div>
 

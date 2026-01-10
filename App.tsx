@@ -144,7 +144,8 @@ export type AdminPermission =
   | 'view_users' | 'approve_users' | 'view_revenue' | 'view_revenue_details'
   | 'send_notification' | 'edit_user_settings' | 'manage_user' | 'chat_user'
   | 'manage_packages' | 'manage_pt_packages' | 'add_pt' | 'view_user_list'
-  | 'manage_promo' | 'manage_voucher' | 'view_schedule' | 'manage_app_interface' | 'manage_bookings';
+  | 'manage_promo' | 'manage_voucher' | 'view_schedule' | 'manage_app_interface' | 'manage_bookings'
+  | 'create_qr'; // New Permission
 
 export interface AdminProfile {
   username: string;

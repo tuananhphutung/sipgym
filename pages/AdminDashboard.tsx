@@ -10,10 +10,11 @@ import {
   Megaphone, UserPlus, ListFilter, Package, PauseCircle, Trash2, Dumbbell,
   UserCheck, Menu, Eye, ShieldAlert, BadgeCheck, Pencil, CreditCard, Image as ImageIcon2, Clock,
   CalendarCheck, AlertCircle, Save, Upload, Type, ScanFace, Phone, Edit3, ChevronRight, ChevronLeft, User as UserIcon, MoreHorizontal, Filter, CheckCircle2,
-  Crop, Video
+  Crop, Video, QrCode, Link
 } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { dbService } from '../services/firebase';
+import QRCode from 'react-qr-code';
 
 interface AdminDashboardProps {
   currentAdmin: AdminProfile | null;
@@ -52,6 +53,7 @@ const PERMISSIONS_LIST: { key: AdminPermission; label: string; icon: any }[] = [
   { key: 'view_revenue', label: 'Doanh Thu', icon: TrendingUp },
   { key: 'send_notification', label: 'Thông Báo', icon: Megaphone },
   { key: 'chat_user', label: 'Hỗ Trợ', icon: MessageSquare },
+  { key: 'create_qr', label: 'Tạo QR', icon: QrCode }, // New
   { key: 'manage_packages', label: 'Gói Gym', icon: Package },
   { key: 'manage_pt_packages', label: 'Gói PT', icon: Dumbbell },
   { key: 'add_pt', label: 'Thêm PT', icon: UserPlus },
@@ -82,6 +84,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedUserPhonesForBroadcast, setSelectedUserPhonesForBroadcast] = useState<string[]>([]);
   const [chatMsg, setChatMsg] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+  
+  // QR Gen State
+  const [qrType, setQrType] = useState<'text' | 'link' | 'image'>('text');
+  const [qrContent, setQrContent] = useState('');
   
   // Form States
   const [giftDays, setGiftDays] = useState('');
@@ -164,18 +170,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Initialize config hero state when popup opens
   useEffect(() => {
       if (showPopup === 'config_hero') {
-          // We need to fetch current settings from somewhere, ideally passed via props or fetched here
-          // For now assuming props are up to date or we rely on parent to pass initial values.
-          // Since props doesn't include video yet in the interface above (we need to add it to App state first), 
-          // let's assume we read from props that might have it or use existing ones.
-          // Note: App.tsx state was updated in previous step to include heroVideo.
-          
-          // To access the video from App state, we might need to subscribe again or pass it as prop.
-          // The prop `heroVideo` is missing in `AdminDashboardProps` interface above, let's assume it was passed or we fetch it.
-          // Actually, we need to update the props interface in this file too.
-          // In App.tsx I added heroVideo to state, but AdminDashboard needs to receive it.
-          // For now, I'll rely on the parent passing it (I will update props interface).
-          
           dbService.subscribe('app_settings', (data: any) => {
                if(data) {
                    setConfigHero({ 
@@ -563,6 +557,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const getActionForPerm = (perm: AdminPermission) => {
       switch(perm) {
           case 'chat_user': return () => setShowPopup('support_list');
+          case 'create_qr': return () => { setQrContent(''); setShowPopup('create_qr'); }; // QR Action
           case 'send_notification': return () => setShowPopup('broadcast');
           case 'view_users': return () => setShowPopup('user_list');
           case 'approve_users': return () => setShowPopup('pending_approvals'); 
@@ -790,6 +785,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <h3 className="font-black text-gray-800 uppercase italic text-lg">
                     {/* ... (Existing titles logic) ... */}
                     {showPopup === 'config_hero' && 'Cấu Hình App'}
+                    {showPopup === 'create_qr' && 'Tạo Mã QR'}
                     {/* ... */}
                  </h3>
                  <button onClick={() => setShowPopup(null)} className="p-2 bg-gray-100 rounded-full text-gray-400 hover:bg-gray-200 transition-colors">
@@ -800,6 +796,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Modal Body */}
               <div className="flex-1 overflow-y-auto p-5 bg-[#F7FAFC]">
                   {/* ... (Existing popups: pending_approvals, user_list, etc.) ... */}
+
+                  {/* QR Creator */}
+                  {showPopup === 'create_qr' && (
+                      <div className="space-y-6">
+                          {/* Tabs */}
+                          <div className="flex bg-gray-100 p-1 rounded-xl">
+                              <button onClick={() => { setQrType('text'); setQrContent(''); }} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase ${qrType === 'text' ? 'bg-white shadow text-[#FF6B00]' : 'text-gray-400'}`}>Văn Bản</button>
+                              <button onClick={() => { setQrType('link'); setQrContent(''); }} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase ${qrType === 'link' ? 'bg-white shadow text-[#FF6B00]' : 'text-gray-400'}`}>Link</button>
+                              <button onClick={() => { setQrType('image'); setQrContent(''); }} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase ${qrType === 'image' ? 'bg-white shadow text-[#FF6B00]' : 'text-gray-400'}`}>Hình Ảnh</button>
+                          </div>
+
+                          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                              {qrType === 'text' && (
+                                  <div>
+                                      <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Nội dung văn bản</label>
+                                      <textarea value={qrContent} onChange={e => setQrContent(e.target.value)} placeholder="Nhập văn bản..." className="w-full bg-gray-50 p-3 rounded-xl text-sm font-medium h-24 resize-none outline-none focus:ring-2 focus:ring-orange-200"/>
+                                  </div>
+                              )}
+                              {qrType === 'link' && (
+                                  <div>
+                                      <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Đường dẫn (URL)</label>
+                                      <div className="relative">
+                                          <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+                                          <input value={qrContent} onChange={e => setQrContent(e.target.value)} placeholder="https://..." className="w-full bg-gray-50 p-3 pl-10 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200"/>
+                                      </div>
+                                  </div>
+                              )}
+                              {qrType === 'image' && (
+                                  <div>
+                                      <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Upload Hình Ảnh</label>
+                                      <ImageUpload currentImage={qrContent || null} onImageUploaded={setQrContent} aspect="aspect-video" className="rounded-xl overflow-hidden"/>
+                                      <p className="text-[10px] text-gray-400 mt-2 italic">*QR sẽ chứa link dẫn tới ảnh này.</p>
+                                  </div>
+                              )}
+                          </div>
+
+                          {qrContent && (
+                              <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-4">
+                                  <div className="bg-white p-4 rounded-3xl shadow-lg border-2 border-orange-100 mb-4">
+                                      <QRCode value={qrContent} size={200} />
+                                  </div>
+                                  <p className="text-xs font-bold text-gray-500 uppercase mb-4 text-center max-w-[200px] truncate">{qrContent}</p>
+                                  <button onClick={() => window.print()} className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold uppercase text-xs shadow-lg active:scale-95 transition-transform">In Mã QR</button>
+                              </div>
+                          )}
+                      </div>
+                  )}
 
                   {/* Config Hero (Updated) */}
                   {showPopup === 'config_hero' && (
