@@ -10,7 +10,7 @@ import {
   Megaphone, UserPlus, ListFilter, Package, PauseCircle, Trash2, Dumbbell,
   UserCheck, Menu, Eye, ShieldAlert, BadgeCheck, Pencil, CreditCard, Image as ImageIcon2, Clock,
   CalendarCheck, AlertCircle, Save, Upload, Type, ScanFace, Phone, Edit3, ChevronRight, ChevronLeft, User as UserIcon, MoreHorizontal, Filter, CheckCircle2,
-  Crop, Video, QrCode, Link
+  Crop, Video, QrCode, Link, Download
 } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { dbService } from '../services/firebase';
@@ -53,7 +53,7 @@ const PERMISSIONS_LIST: { key: AdminPermission; label: string; icon: any }[] = [
   { key: 'view_revenue', label: 'Doanh Thu', icon: TrendingUp },
   { key: 'send_notification', label: 'Thông Báo', icon: Megaphone },
   { key: 'chat_user', label: 'Hỗ Trợ', icon: MessageSquare },
-  { key: 'create_qr', label: 'Tạo QR', icon: QrCode }, // New
+  { key: 'create_qr', label: 'Tạo QR', icon: QrCode }, 
   { key: 'manage_packages', label: 'Gói Gym', icon: Package },
   { key: 'manage_pt_packages', label: 'Gói PT', icon: Dumbbell },
   { key: 'add_pt', label: 'Thêm PT', icon: UserPlus },
@@ -136,7 +136,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [transactions, setTransactions] = useState<RevenueTransaction[]>([]);
   
   useEffect(() => {
-      // Fetch Transactions for independent revenue
       dbService.subscribe('transactions', (data: any) => {
           let raw = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
           setTransactions(raw);
@@ -198,13 +197,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const pendingPTUsers = allUsers.filter(u => u.ptSubscription?.status === 'Pending');
   const pendingPreserveUsers = allUsers.filter(u => u.subscription?.status === 'Pending Preservation');
   const pendingBookings = bookings.filter(b => b.status === 'Pending');
+  const pendingAccounts = allUsers.filter(u => u.accountStatus === 'Pending');
   
-  const totalPendingApprovals = pendingUsers.length + pendingPTUsers.length + pendingPreserveUsers.length + pendingBookings.length;
+  const totalPendingApprovals = pendingUsers.length + pendingPTUsers.length + pendingPreserveUsers.length + pendingBookings.length + pendingAccounts.length;
 
-  // Active Users only for "View Users"
-  const activeUsers = allUsers; // Show all users
+  const activeUsers = allUsers;
 
-  // Logic to auto-hide Admin Notification Toast
   useEffect(() => {
       if (totalPendingApprovals > 0) {
           setShowAdminToast(true);
@@ -228,7 +226,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return lastMsg && lastMsg.sender === 'user';
   }).length;
 
-  // Camera Logic for Admin Face ID
   const startAdminCamera = async () => {
       try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
@@ -333,6 +330,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }); 
       setAllUsers(updatedUsers); 
   };
+
+  const handleApproveAccount = (phone: string) => {
+      const updatedUsers = allUsers.map(u => {
+          if (u.phone === phone) {
+              return { 
+                  ...u, 
+                  accountStatus: 'Active' as const,
+                  notifications: [{ 
+                      id: Math.random().toString(), 
+                      text: `Chào mừng! Tài khoản của bạn đã được Admin duyệt thành công.`, 
+                      date: Date.now(), 
+                      read: false 
+                  }, ...u.notifications]
+              };
+          }
+          return u;
+      });
+      setAllUsers(updatedUsers);
+  };
   
   const handleBroadcast = () => { 
       if (!broadcastMsg.trim()) return; 
@@ -425,7 +441,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const newMsg = { sender: 'admin' as const, text: chatMsg, timestamp: Date.now() }; 
       const newUsers = allUsers.map(u => { 
           if (u.phone === selectedUserPhone) { 
-              // Send notification to user about new message
               return { 
                   ...u, 
                   messages: [...u.messages, newMsg],
@@ -437,7 +452,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setChatMsg(''); 
   };
   
-  // CRUD Functions...
   const handleCreateOrUpdatePackage = () => { 
       if (!newPackage.name || !newPackage.price || !newPackage.duration) return alert("Vui lòng nhập đủ thông tin: Tên, Giá, Số tháng"); 
       
@@ -452,12 +466,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       };
 
       if (editingPackageId) {
-          // Update
           const updatedPackages = packages.map(p => p.id === editingPackageId ? pkgData : p);
           setPackages(updatedPackages);
           setEditingPackageId(null);
       } else {
-          // Create
           setPackages([...packages, pkgData]); 
       }
       setNewPackage({ name: '', price: '', image: '', description: '', duration: '', categoryId: 'gym' }); 
@@ -531,7 +543,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert("Cập nhật thông tin Admin thành công!");
   };
 
-  // Helper for floating menu item
   const FloatingMenuItem = ({ icon: Icon, label, action, perm, badgeCount }: any) => {
      const allowed = hasPermission(perm);
      return (
@@ -557,7 +568,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const getActionForPerm = (perm: AdminPermission) => {
       switch(perm) {
           case 'chat_user': return () => setShowPopup('support_list');
-          case 'create_qr': return () => { setQrContent(''); setShowPopup('create_qr'); }; // QR Action
+          case 'create_qr': return () => { setQrContent(''); setShowPopup('create_qr'); }; 
           case 'send_notification': return () => setShowPopup('broadcast');
           case 'view_users': return () => setShowPopup('user_list');
           case 'approve_users': return () => setShowPopup('pending_approvals'); 
@@ -583,7 +594,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
   
-  // Sort users for chat list (active/pending first)
   const sortedChatUsers = allUsers.filter(u => u.messages.length > 0 || u.subscription?.status === 'Pending' || u.ptSubscription?.status === 'Pending').sort((a, b) => {
       const lastMsgA = a.messages[a.messages.length - 1];
       const lastMsgB = b.messages[b.messages.length - 1];
@@ -594,7 +604,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="bg-[#FFF7ED] min-h-full text-gray-700 pb-20 font-sans selection:bg-orange-200 relative">
-      {/* Header */}
       <header className="bg-white/80 backdrop-blur-xl border-b border-orange-100 px-6 py-4 sticky top-0 z-[100] flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-4" onClick={() => {
             setEditAdminProfile({
@@ -630,7 +639,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </header>
 
-      {/* Floating Menu */}
       {currentAdmin?.settings.showFloatingMenu && (
         <div className="fixed bottom-6 right-6 z-[150] flex flex-col items-end gap-2">
            {isFloatingMenuOpen && (
@@ -659,7 +667,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* Admin Notification Popup (Clickable Toast - Auto Hide) */}
       {currentAdmin?.settings.showPopupNoti && showAdminToast && (totalPendingApprovals > 0) && (
          <div 
             onClick={() => setShowPopup('pending_approvals')}
@@ -670,13 +677,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                <button onClick={(e) => { e.stopPropagation(); setShowAdminToast(false); }} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3"/></button>
             </div>
             <div className="space-y-1">
+                {pendingAccounts.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingAccounts.length} đăng ký tài khoản mới</p>}
                 {pendingUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingUsers.length} gói tập Gym mới</p>}
                 {pendingPTUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingPTUsers.length} đăng ký PT mới</p>}
                 {pendingBookings.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingBookings.length} lịch đặt PT</p>}
                 {pendingPreserveUsers.length > 0 && <p className="text-[10px] text-gray-600 font-bold">• {pendingPreserveUsers.length} yêu cầu bảo lưu</p>}
             </div>
             
-            {/* Countdown bar visual */}
             <div className="absolute bottom-0 left-0 h-1 bg-orange-100 w-full">
                 <div className="h-full bg-orange-400 animate-[shrink_6s_linear_forwards] origin-left"></div>
             </div>
@@ -685,10 +692,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       <main className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Revenue Widget */}
           <div 
              onClick={() => hasPermission('view_revenue') && setShowPopup('revenue_report')}
              className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all active:scale-95 ${hasPermission('view_revenue') ? 'cursor-pointer group hover:border-green-200 hover:shadow-md' : 'cursor-not-allowed opacity-70 grayscale'}`}
@@ -702,7 +706,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                ) : <p className="text-sm italic text-gray-400">Hidden</p>}
           </div>
 
-          {/* Support Widget */}
           <div 
             onClick={() => hasPermission('chat_user') && setShowPopup('support_list')}
             className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all active:scale-95 ${hasPermission('chat_user') ? 'cursor-pointer hover:border-orange-200 group hover:shadow-md' : 'opacity-70 cursor-not-allowed grayscale'}`}
@@ -715,7 +718,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
              <p className="text-2xl font-black text-gray-800">{pendingSupportCount} <span className="text-xs text-orange-500 font-bold">chờ xử lý</span></p>
           </div>
 
-          {/* Users Widget */}
           <div 
                onClick={() => hasPermission('view_users') && setShowPopup('user_list')}
                className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all active:scale-95 ${hasPermission('view_users') ? 'cursor-pointer hover:border-blue-200 group hover:shadow-md' : 'cursor-not-allowed opacity-70 grayscale'}`}
@@ -727,7 +729,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                {hasPermission('view_users') ? <p className="text-2xl font-black text-gray-800">{activeUsers.length}</p> : <p className="text-sm italic text-gray-400">Hidden</p>}
           </div>
           
-           {/* Settings Toggle Card */}
            <div 
               onClick={() => hasPermission('manage_app_interface') && setShowPopup('config_hero')}
               className={`bg-white/60 backdrop-blur-md border border-white/60 p-5 rounded-[32px] shadow-sm transition-all active:scale-95 ${hasPermission('manage_app_interface') ? 'cursor-pointer hover:border-purple-200 hover:shadow-md' : 'opacity-70 cursor-not-allowed grayscale'}`}
@@ -745,7 +746,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
 
-        {/* --- MENU ADMIN GRID --- */}
         <div>
            <h3 className="text-gray-800 font-black text-sm uppercase italic mb-4 flex items-center gap-2">
              <LayoutDashboard className="w-4 h-4 text-[#FF6B00]" />
@@ -774,38 +774,163 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* --- POPUPS SECTION --- */}
       {showPopup && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:px-4 animate-in fade-in duration-300">
-           {/* Backdrop */}
            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowPopup(null)} />
            
-           {/* Modal Content */}
-           <div className="relative w-full sm:max-w-lg bg-white rounded-t-[32px] sm:rounded-[32px] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-20 sm:zoom-in-95">
+           <div className="relative w-full sm:max-w-lg bg-white rounded-t-[32px] sm:rounded-[32px] max-h-[90vh] min-h-[50vh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-20 sm:zoom-in-95">
               
-              {/* Modal Header */}
               <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20">
                  <h3 className="font-black text-gray-800 uppercase italic text-lg">
-                    {/* ... (Existing titles logic) ... */}
+                    {showPopup === 'pending_approvals' && 'Duyệt Yêu Cầu'}
+                    {showPopup === 'user_list' && 'Danh Sách Hội Viên'}
+                    {showPopup === 'broadcast' && 'Gửi Thông Báo'}
+                    {showPopup === 'revenue_report' && 'Báo Cáo Doanh Thu'}
+                    {showPopup === 'support_list' && 'Hỗ Trợ Khách Hàng'}
+                    {showPopup === 'packages' && 'Quản Lý Gói Gym'}
+                    {showPopup === 'pt_packages' && 'Quản Lý Gói PT'}
+                    {showPopup === 'add_pt' && 'Quản Lý PT'}
+                    {showPopup === 'create_promo' && 'Quản Lý Khuyến Mãi'}
+                    {showPopup === 'create_voucher' && 'Quản Lý Voucher'}
                     {showPopup === 'config_hero' && 'Cấu Hình App'}
+                    {showPopup === 'manage_admins' && 'Quản Lý Admin'}
+                    {showPopup === 'admin_profile' && 'Hồ Sơ Admin'}
+                    {showPopup === 'chat' && `Chat: ${allUsers.find(u => u.phone === selectedUserPhone)?.name}`}
+                    {showPopup === 'user_settings' && 'Thông Tin Hội Viên'}
+                    {showPopup === 'view_schedule' && 'Lịch Đặt PT'}
                     {showPopup === 'create_qr' && 'Tạo Mã QR'}
-                    {/* ... */}
                  </h3>
                  <button onClick={() => setShowPopup(null)} className="p-2 bg-gray-100 rounded-full text-gray-400 hover:bg-gray-200 transition-colors">
                     <X className="w-5 h-5" />
                  </button>
               </div>
 
-              {/* Modal Body */}
               <div className="flex-1 overflow-y-auto p-5 bg-[#F7FAFC]">
-                  {/* ... (Existing popups: pending_approvals, user_list, etc.) ... */}
+                  {showPopup === 'pending_approvals' && (
+                      <div className="space-y-6">
+                          {pendingAccounts.length > 0 && (
+                             <div>
+                                <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Tài Khoản Mới ({pendingAccounts.length})</h4>
+                                <div className="space-y-2">
+                                   {pendingAccounts.map(u => (
+                                      <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex justify-between items-center">
+                                         <div>
+                                            <p className="font-bold text-gray-800 text-sm">{u.realName || u.name}</p>
+                                            <p className="text-xs text-gray-500 font-medium">{u.phone}</p>
+                                         </div>
+                                         <button onClick={() => handleApproveAccount(u.phone)} className="bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-blue-200">Duyệt TK</button>
+                                      </div>
+                                   ))}
+                                </div>
+                             </div>
+                          )}
 
-                  {/* QR Creator */}
+                          {pendingBookings.length > 0 && (
+                             <div>
+                                <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Lịch Đặt PT ({pendingBookings.length})</h4>
+                                <div className="space-y-2">
+                                   {pendingBookings.map(b => (
+                                      <div key={b.id} className="bg-white p-4 rounded-2xl shadow-sm border border-orange-100">
+                                         <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                               <p className="font-bold text-gray-800 text-sm">{b.userName} <span className="text-gray-400 font-normal">đặt</span> {b.trainerName}</p>
+                                               <p className="text-xs text-gray-500 font-medium">{b.date} • {b.timeSlot}</p>
+                                            </div>
+                                         </div>
+                                         <div className="flex gap-2 mt-2">
+                                            <button onClick={() => handleBookingAction(b.id, 'approve')} className="flex-1 bg-green-500 text-white py-2 rounded-xl text-xs font-bold uppercase">Duyệt</button>
+                                            <button onClick={() => handleBookingAction(b.id, 'reject')} className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-xl text-xs font-bold uppercase">Từ chối</button>
+                                         </div>
+                                      </div>
+                                   ))}
+                                </div>
+                             </div>
+                          )}
+
+                          {pendingUsers.length > 0 && (
+                              <div>
+                                  <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Đăng Ký Gói Gym ({pendingUsers.length})</h4>
+                                  <div className="space-y-2">
+                                      {pendingUsers.map(u => (
+                                          <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-blue-100">
+                                              <p className="font-bold text-gray-800 text-sm">{u.realName || u.name} - {u.phone}</p>
+                                              <p className="text-xs text-blue-500 font-bold uppercase mt-1">Gói: {u.subscription?.name} ({u.subscription?.months} tháng)</p>
+                                              <p className="text-xs text-gray-500">Giá: {u.subscription?.price.toLocaleString()}đ</p>
+                                              <div className="flex gap-2 mt-3">
+                                                  <button onClick={() => handleApprove(u.phone)} className="flex-1 bg-blue-500 text-white py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-blue-200">Xác Nhận Đã Thu Tiền</button>
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          )}
+                          
+                          {pendingPTUsers.length > 0 && (
+                              <div>
+                                  <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Đăng Ký Gói PT ({pendingPTUsers.length})</h4>
+                                  <div className="space-y-2">
+                                      {pendingPTUsers.map(u => (
+                                          <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-purple-100">
+                                              <p className="font-bold text-gray-800 text-sm">{u.realName || u.name} - {u.phone}</p>
+                                              <p className="text-xs text-purple-500 font-bold uppercase mt-1">Gói: {u.ptSubscription?.name}</p>
+                                              <p className="text-xs text-gray-500">Giá: {u.ptSubscription?.price.toLocaleString()}đ</p>
+                                              <div className="flex gap-2 mt-3">
+                                                  <button onClick={() => handleApprovePT(u.phone)} className="flex-1 bg-purple-500 text-white py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-purple-200">Xác Nhận Đã Thu Tiền</button>
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          )}
+
+                          {pendingPreserveUsers.length > 0 && (
+                              <div>
+                                  <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Yêu Cầu Bảo Lưu ({pendingPreserveUsers.length})</h4>
+                                  <div className="space-y-2">
+                                      {pendingPreserveUsers.map(u => (
+                                          <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-yellow-100">
+                                              <p className="font-bold text-gray-800 text-sm">{u.realName || u.name} - {u.phone}</p>
+                                              <p className="text-xs text-gray-500">Gói hiện tại: {u.subscription?.name}</p>
+                                              <div className="flex gap-2 mt-3">
+                                                  <button onClick={() => handleApprovePreservation(u.phone)} className="flex-1 bg-yellow-500 text-white py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-yellow-200">Chấp Thuận Bảo Lưu</button>
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          )}
+
+                          {totalPendingApprovals === 0 && (
+                              <div className="text-center py-10 opacity-50">
+                                  <CheckCircle2 className="w-16 h-16 mx-auto mb-2 text-green-500"/>
+                                  <p className="font-bold text-gray-500">Không có yêu cầu nào cần duyệt</p>
+                              </div>
+                          )}
+                      </div>
+                  )}
+
                   {showPopup === 'create_qr' && (
                       <div className="space-y-6">
-                          {/* Tabs */}
                           <div className="flex bg-gray-100 p-1 rounded-xl">
                               <button onClick={() => { setQrType('text'); setQrContent(''); }} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase ${qrType === 'text' ? 'bg-white shadow text-[#FF6B00]' : 'text-gray-400'}`}>Văn Bản</button>
                               <button onClick={() => { setQrType('link'); setQrContent(''); }} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase ${qrType === 'link' ? 'bg-white shadow text-[#FF6B00]' : 'text-gray-400'}`}>Link</button>
                               <button onClick={() => { setQrType('image'); setQrContent(''); }} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase ${qrType === 'image' ? 'bg-white shadow text-[#FF6B00]' : 'text-gray-400'}`}>Hình Ảnh</button>
                           </div>
+
+                          <button 
+                             onClick={() => {
+                                 setQrType('link');
+                                 setQrContent(window.location.origin + '/?install=true');
+                             }}
+                             className="w-full bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center justify-between group active:scale-95 transition-transform"
+                          >
+                             <div className="flex items-center gap-3">
+                                <div className="bg-blue-500 text-white w-8 h-8 rounded-lg flex items-center justify-center"><Download className="w-4 h-4"/></div>
+                                <div className="text-left">
+                                   <p className="font-bold text-gray-800 text-xs uppercase">Tạo QR Cài Đặt App</p>
+                                   <p className="text-[10px] text-gray-500">Khách quét sẽ hiện ngay hướng dẫn cài App</p>
+                                </div>
+                             </div>
+                             <ArrowRight className="w-4 h-4 text-blue-300"/>
+                          </button>
 
                           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                               {qrType === 'text' && (
@@ -844,149 +969,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Config Hero (Updated) */}
-                  {showPopup === 'config_hero' && (
-                      <div className="space-y-4">
-                          <div>
-                              <label className="text-xs font-bold text-gray-400 uppercase">Logo App</label>
-                              <ImageUpload currentImage={configHero.appLogo} onImageUploaded={(url) => setConfigHero({...configHero, appLogo: url})} aspect="aspect-square" className="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-gray-200 mt-2"/>
-                          </div>
-                          <div>
-                              <label className="text-xs font-bold text-gray-400 uppercase">Tiêu đề lớn</label>
-                              <textarea value={configHero.title} onChange={e => setConfigHero({...configHero, title: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
-                          </div>
-                          <div>
-                              <label className="text-xs font-bold text-gray-400 uppercase">Phụ đề (Tagline)</label>
-                              <input value={configHero.subtitle} onChange={e => setConfigHero({...configHero, subtitle: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
-                          </div>
-                          <div>
-                             <label className="text-xs font-bold text-gray-400 uppercase">Overlay Text (Trên ảnh)</label>
-                             <input value={configHero.overlayText} onChange={e => setConfigHero({...configHero, overlayText: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
-                          </div>
-                          <div>
-                             <label className="text-xs font-bold text-gray-400 uppercase">Overlay Sub (Trên ảnh)</label>
-                             <input value={configHero.overlaySub} onChange={e => setConfigHero({...configHero, overlaySub: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
-                          </div>
-                          
-                          <div className="bg-white p-3 rounded-xl border border-gray-100">
-                              <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Ảnh nền Banner (Mặc định)</label>
-                              <ImageUpload currentImage={configHero.image} onImageUploaded={(url) => setConfigHero({...configHero, image: url})} aspect="aspect-square" className="rounded-xl overflow-hidden"/>
-                          </div>
-
-                          <div className="bg-white p-3 rounded-xl border border-gray-100">
-                              <label className="text-xs font-bold text-gray-400 uppercase mb-2 block flex items-center gap-1"><Video className="w-3 h-3"/> Video nền (Tùy chọn)</label>
-                              <p className="text-[10px] text-gray-500 mb-2">Nếu upload video, video sẽ tự động phát thay cho ảnh.</p>
-                              <ImageUpload 
-                                  currentImage={configHero.video} 
-                                  onImageUploaded={(url) => setConfigHero({...configHero, video: url})} 
-                                  aspect="aspect-square" 
-                                  className="rounded-xl overflow-hidden"
-                                  accept="video/*"
-                                  label=""
-                              />
-                          </div>
-
-                          <button onClick={handleSaveAppConfig} className="w-full bg-purple-500 text-white py-3 rounded-xl font-black uppercase text-sm shadow-lg">Lưu Cấu Hình</button>
-                      </div>
-                  )}
-
-                  {/* ... (Other existing popups) ... */}
-                  {/* To ensure XML validity and context, I'm just showing the config_hero change above, but in a real file write, the other popups would be here. Since I provided the full file content in the `content` block, I need to make sure I include the other parts or use the existing structure. I will include the full file content. */}
-                  
-                  {/* ... (Rest of the file is identical to previous version, just injected config_hero updates) ... */}
-                  
-                  {showPopup === 'pending_approvals' && (
-                      <div className="space-y-6">
-                          {/* ... (Implementation from previous file) ... */}
-                           {/* Bookings */}
-                          {pendingBookings.length > 0 && (
-                             <div>
-                                <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Lịch Đặt PT ({pendingBookings.length})</h4>
-                                <div className="space-y-2">
-                                   {pendingBookings.map(b => (
-                                      <div key={b.id} className="bg-white p-4 rounded-2xl shadow-sm border border-orange-100">
-                                         <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                               <p className="font-bold text-gray-800 text-sm">{b.userName} <span className="text-gray-400 font-normal">đặt</span> {b.trainerName}</p>
-                                               <p className="text-xs text-gray-500 font-medium">{b.date} • {b.timeSlot}</p>
-                                            </div>
-                                         </div>
-                                         <div className="flex gap-2 mt-2">
-                                            <button onClick={() => handleBookingAction(b.id, 'approve')} className="flex-1 bg-green-500 text-white py-2 rounded-xl text-xs font-bold uppercase">Duyệt</button>
-                                            <button onClick={() => handleBookingAction(b.id, 'reject')} className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-xl text-xs font-bold uppercase">Từ chối</button>
-                                         </div>
-                                      </div>
-                                   ))}
-                                </div>
-                             </div>
-                          )}
-
-                          {/* Subscriptions */}
-                          {pendingUsers.length > 0 && (
-                              <div>
-                                  <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Đăng Ký Gói Gym ({pendingUsers.length})</h4>
-                                  <div className="space-y-2">
-                                      {pendingUsers.map(u => (
-                                          <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-blue-100">
-                                              <p className="font-bold text-gray-800 text-sm">{u.realName || u.name} - {u.phone}</p>
-                                              <p className="text-xs text-blue-500 font-bold uppercase mt-1">Gói: {u.subscription?.name} ({u.subscription?.months} tháng)</p>
-                                              <p className="text-xs text-gray-500">Giá: {u.subscription?.price.toLocaleString()}đ</p>
-                                              <div className="flex gap-2 mt-3">
-                                                  <button onClick={() => handleApprove(u.phone)} className="flex-1 bg-blue-500 text-white py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-blue-200">Xác Nhận Đã Thu Tiền</button>
-                                              </div>
-                                          </div>
-                                      ))}
-                                  </div>
-                              </div>
-                          )}
-                          
-                          {/* PT Subscriptions */}
-                          {pendingPTUsers.length > 0 && (
-                              <div>
-                                  <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Đăng Ký Gói PT ({pendingPTUsers.length})</h4>
-                                  <div className="space-y-2">
-                                      {pendingPTUsers.map(u => (
-                                          <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-purple-100">
-                                              <p className="font-bold text-gray-800 text-sm">{u.realName || u.name} - {u.phone}</p>
-                                              <p className="text-xs text-purple-500 font-bold uppercase mt-1">Gói: {u.ptSubscription?.name}</p>
-                                              <p className="text-xs text-gray-500">Giá: {u.ptSubscription?.price.toLocaleString()}đ</p>
-                                              <div className="flex gap-2 mt-3">
-                                                  <button onClick={() => handleApprovePT(u.phone)} className="flex-1 bg-purple-500 text-white py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-purple-200">Xác Nhận Đã Thu Tiền</button>
-                                              </div>
-                                          </div>
-                                      ))}
-                                  </div>
-                              </div>
-                          )}
-
-                          {/* Preservations */}
-                          {pendingPreserveUsers.length > 0 && (
-                              <div>
-                                  <h4 className="font-black text-gray-400 text-xs uppercase mb-2">Yêu Cầu Bảo Lưu ({pendingPreserveUsers.length})</h4>
-                                  <div className="space-y-2">
-                                      {pendingPreserveUsers.map(u => (
-                                          <div key={u.phone} className="bg-white p-4 rounded-2xl shadow-sm border border-yellow-100">
-                                              <p className="font-bold text-gray-800 text-sm">{u.realName || u.name} - {u.phone}</p>
-                                              <p className="text-xs text-gray-500">Gói hiện tại: {u.subscription?.name}</p>
-                                              <div className="flex gap-2 mt-3">
-                                                  <button onClick={() => handleApprovePreservation(u.phone)} className="flex-1 bg-yellow-500 text-white py-2 rounded-xl text-xs font-bold uppercase shadow-md shadow-yellow-200">Chấp Thuận Bảo Lưu</button>
-                                              </div>
-                                          </div>
-                                      ))}
-                                  </div>
-                              </div>
-                          )}
-
-                          {totalPendingApprovals === 0 && (
-                              <div className="text-center py-10 opacity-50">
-                                  <CheckCircle2 className="w-16 h-16 mx-auto mb-2 text-green-500"/>
-                                  <p className="font-bold text-gray-500">Không có yêu cầu nào cần duyệt</p>
-                              </div>
-                          )}
-                      </div>
-                  )}
-
-                  {/* User List */}
                   {showPopup === 'user_list' && (
                       <div className="space-y-4">
                           <div className="relative">
@@ -1013,7 +995,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* User Settings */}
                   {showPopup === 'user_settings' && selectedUser && (
                       <div className="space-y-4">
                           <div className="bg-white p-4 rounded-2xl flex flex-col items-center">
@@ -1022,6 +1003,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </div>
                               <input value={editingRealName} onChange={e => setEditingRealName(e.target.value)} className="text-center font-black text-lg bg-transparent border-b border-gray-200 focus:border-orange-500 outline-none pb-1" placeholder="Tên thật"/>
                               <p className="text-xs font-bold text-gray-400 mt-1">{selectedUser.phone}</p>
+                              <div className="flex justify-center mt-1">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedUser.accountStatus === 'Active' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                                      {selectedUser.accountStatus === 'Active' ? 'Active' : 'Pending Approval'}
+                                  </span>
+                              </div>
                               
                               <div className="grid grid-cols-2 gap-2 w-full mt-4">
                                   <button onClick={() => setShowPopup('chat')} className="bg-blue-50 text-blue-600 py-2 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-1"><MessageSquare className="w-4 h-4"/> Chat</button>
@@ -1047,7 +1033,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Broadcast */}
                   {showPopup === 'broadcast' && (
                       <div className="space-y-4">
                           <textarea value={broadcastMsg} onChange={e => setBroadcastMsg(e.target.value)} className="w-full h-32 bg-white rounded-2xl p-4 font-medium text-sm border-none focus:ring-2 focus:ring-orange-200" placeholder="Nhập nội dung thông báo..."/>
@@ -1059,7 +1044,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Revenue Report */}
                   {showPopup === 'revenue_report' && (
                       <div className="space-y-4">
                           <input type="date" value={revenueDate} onChange={e => setRevenueDate(e.target.value)} className="w-full bg-white p-3 rounded-xl font-bold text-gray-700"/>
@@ -1071,29 +1055,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <p className="text-gray-400 text-xs font-black uppercase tracking-widest mb-2">Tổng doanh thu toàn thời gian</p>
                               <p className="text-3xl font-black text-blue-500">{calculateTotalRevenue().toLocaleString()}đ</p>
                           </div>
-                          {/* Transaction List for the Day */}
-                          <div className="space-y-2">
-                              {transactions
-                                .filter(t => new Date(t.date).toDateString() === new Date(revenueDate).toDateString())
-                                .map(t => (
-                                  <div key={t.id} className="bg-white p-3 rounded-xl flex justify-between items-center text-xs">
-                                      <div>
-                                          <p className="font-bold text-gray-800">{t.userName}</p>
-                                          <p className="text-gray-500">{t.packageName} • {t.method}</p>
-                                      </div>
-                                      <span className="font-black text-green-600">+{t.amount.toLocaleString()}đ</span>
-                                  </div>
-                              ))}
-                          </div>
                       </div>
                   )}
 
-                  {/* Support List (Chat List) */}
                   {showPopup === 'support_list' && (
                       <div className="space-y-2">
                           {sortedChatUsers.map(u => {
                               const lastMsg = u.messages[u.messages.length - 1];
-                              const isUnread = lastMsg && lastMsg.sender === 'user'; // Basic unread logic
+                              const isUnread = lastMsg && lastMsg.sender === 'user'; 
                               return (
                                   <div key={u.phone} onClick={() => { setSelectedUserPhone(u.phone); setShowPopup('chat'); }} className={`p-4 rounded-xl flex items-center gap-3 cursor-pointer ${isUnread ? 'bg-orange-50 border border-orange-200' : 'bg-white'}`}>
                                       <div className="relative">
@@ -1113,7 +1082,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Chat Detail */}
                   {showPopup === 'chat' && selectedUser && (
                       <div className="flex flex-col h-full max-h-[60vh]">
                           <div className="flex-1 overflow-y-auto space-y-3 p-2">
@@ -1133,24 +1101,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Packages Manager */}
+                  {showPopup === 'config_hero' && (
+                      <div className="space-y-4">
+                          <div>
+                              <label className="text-xs font-bold text-gray-400 uppercase">Logo App</label>
+                              <ImageUpload currentImage={configHero.appLogo} onImageUploaded={(url) => setConfigHero({...configHero, appLogo: url})} aspect="aspect-square" className="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-gray-200 mt-2"/>
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-gray-400 uppercase">Tiêu đề lớn</label>
+                              <textarea value={configHero.title} onChange={e => setConfigHero({...configHero, title: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-gray-400 uppercase">Phụ đề (Tagline)</label>
+                              <input value={configHero.subtitle} onChange={e => setConfigHero({...configHero, subtitle: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
+                          </div>
+                          <div>
+                             <label className="text-xs font-bold text-gray-400 uppercase">Overlay Text (Trên ảnh)</label>
+                             <input value={configHero.overlayText} onChange={e => setConfigHero({...configHero, overlayText: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
+                          </div>
+                          <div>
+                             <label className="text-xs font-bold text-gray-400 uppercase">Overlay Sub (Trên ảnh)</label>
+                             <input value={configHero.overlaySub} onChange={e => setConfigHero({...configHero, overlaySub: e.target.value})} className="w-full bg-white rounded-xl p-3 font-bold text-sm mt-1"/>
+                          </div>
+                          <div className="bg-white p-3 rounded-xl border border-gray-100">
+                              <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Ảnh nền Banner (Mặc định)</label>
+                              <ImageUpload currentImage={configHero.image} onImageUploaded={(url) => setConfigHero({...configHero, image: url})} aspect="aspect-square" className="rounded-xl overflow-hidden"/>
+                          </div>
+                          <div className="bg-white p-3 rounded-xl border border-gray-100">
+                              <label className="text-xs font-bold text-gray-400 uppercase mb-2 block flex items-center gap-1"><Video className="w-3 h-3"/> Video nền (Tùy chọn)</label>
+                              <p className="text-[10px] text-gray-500 mb-2">Nếu upload video, video sẽ tự động phát thay cho ảnh.</p>
+                              <ImageUpload 
+                                  currentImage={configHero.video} 
+                                  onImageUploaded={(url) => setConfigHero({...configHero, video: url})} 
+                                  aspect="aspect-square" 
+                                  className="rounded-xl overflow-hidden"
+                                  accept="video/*"
+                                  label=""
+                              />
+                          </div>
+                          <button onClick={handleSaveAppConfig} className="w-full bg-purple-500 text-white py-3 rounded-xl font-black uppercase text-sm shadow-lg">Lưu Cấu Hình</button>
+                      </div>
+                  )}
+
                   {showPopup === 'packages' && (
                       <div className="space-y-6">
                            <div className="bg-white p-4 rounded-2xl shadow-sm">
                                <h4 className="font-black text-gray-400 text-xs uppercase mb-3">{editingPackageId ? 'Sửa Gói' : 'Thêm Gói Mới'}</h4>
                                <div className="space-y-3">
-                                   <div className="flex gap-2 mb-2">
-                                       <button onClick={() => setNewPackage({...newPackage, categoryId: 'gym'})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase border ${newPackage.categoryId === 'gym' ? 'bg-orange-50 border-[#FF6B00] text-[#FF6B00]' : 'border-gray-200 text-gray-400'}`}>Gói Gym</button>
-                                       <button onClick={() => setNewPackage({...newPackage, categoryId: 'groupx'})} className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase border ${newPackage.categoryId === 'groupx' ? 'bg-purple-50 border-purple-500 text-purple-500' : 'border-gray-200 text-gray-400'}`}>Gói Group X</button>
-                                   </div>
                                    <input value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} placeholder="Tên gói (VD: 1 Tháng)" className="w-full bg-gray-50 px-3 py-2 rounded-xl text-sm font-bold"/>
                                    <input type="number" value={newPackage.price} onChange={e => setNewPackage({...newPackage, price: e.target.value})} placeholder="Giá tiền" className="w-full bg-gray-50 px-3 py-2 rounded-xl text-sm font-bold"/>
                                    <input type="number" value={newPackage.duration} onChange={e => setNewPackage({...newPackage, duration: e.target.value})} placeholder="Số tháng (VD: 1, 3, 6)" className="w-full bg-gray-50 px-3 py-2 rounded-xl text-sm font-bold"/>
                                    <input value={newPackage.description} onChange={e => setNewPackage({...newPackage, description: e.target.value})} placeholder="Mô tả ngắn" className="w-full bg-gray-50 px-3 py-2 rounded-xl text-sm font-bold"/>
-                                   <div className="border-2 border-dashed border-gray-200 rounded-xl p-2 relative">
-                                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1 flex items-center gap-1"><Crop className="w-3 h-3"/> Ảnh gói (Có thể chỉnh sửa bố cục)</p>
-                                      <ImageUpload currentImage={newPackage.image} onImageUploaded={(url) => setNewPackage({...newPackage, image: url})} label="" aspect="aspect-video" className="rounded-xl overflow-hidden"/>
-                                   </div>
+                                   <ImageUpload currentImage={newPackage.image} onImageUploaded={(url) => setNewPackage({...newPackage, image: url})} label="Ảnh Gói" aspect="h-48" className="rounded-xl overflow-hidden"/>
                                    
                                    <div className="flex gap-2">
                                        <button onClick={handleCreateOrUpdatePackage} className="flex-1 bg-green-500 text-white py-3 rounded-xl font-black uppercase text-xs shadow-md">{editingPackageId ? 'Cập Nhật' : 'Thêm Gói'}</button>
@@ -1161,8 +1163,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                            
                            <div className="space-y-2">
                                {packages.map(p => (
-                                   <div key={p.id} className="bg-white p-3 rounded-xl flex gap-3 items-center shadow-sm relative overflow-hidden">
-                                       <div className={`absolute left-0 top-0 bottom-0 w-1 ${p.categoryId === 'gym' ? 'bg-[#FF6B00]' : 'bg-purple-500'}`}></div>
+                                   <div key={p.id} className="bg-white p-3 rounded-xl flex gap-3 items-center shadow-sm">
                                        <img src={p.image} className="w-12 h-12 rounded-lg object-cover bg-gray-100"/>
                                        <div className="flex-1">
                                            <p className="font-bold text-sm text-gray-800">{p.name}</p>
@@ -1176,7 +1177,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* PT Packages Manager */}
                   {showPopup === 'pt_packages' && (
                        <div className="space-y-6">
                            <div className="bg-white p-4 rounded-2xl shadow-sm">
@@ -1205,7 +1205,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        </div>
                   )}
 
-                  {/* Trainers Manager */}
                   {showPopup === 'add_pt' && (
                        <div className="space-y-6">
                            <div className="bg-white p-4 rounded-2xl shadow-sm">
@@ -1232,7 +1231,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        </div>
                   )}
                   
-                  {/* View Schedule */}
                   {showPopup === 'view_schedule' && (
                       <div className="space-y-4">
                           <p className="text-center text-gray-400 text-xs font-bold uppercase mb-2">Hôm nay: {new Date().toLocaleDateString('vi-VN')}</p>
@@ -1254,7 +1252,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Create Promo */}
                   {showPopup === 'create_promo' && (
                       <div className="space-y-6">
                            <div className="bg-white p-4 rounded-2xl shadow-sm">
@@ -1278,7 +1275,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Create Voucher */}
                   {showPopup === 'create_voucher' && (
                       <div className="space-y-6">
                            <div className="bg-white p-4 rounded-2xl shadow-sm">
@@ -1311,7 +1307,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Manage Admins (Super Admin Only) */}
                   {showPopup === 'manage_admins' && (
                       <div className="space-y-6">
                            <div className="bg-white p-4 rounded-2xl shadow-sm">
@@ -1355,7 +1350,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   )}
 
-                  {/* Admin Profile */}
                   {showPopup === 'admin_profile' && (
                       <div className="space-y-4">
                            <div className="flex justify-center mb-4">

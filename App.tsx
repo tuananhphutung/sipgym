@@ -250,30 +250,46 @@ const AppContent: React.FC = () => {
   const isAdminPath = location.pathname.startsWith('/admin');
 
   useEffect(() => {
-    const savedAdminsStr = localStorage.getItem('sip_gym_admins_db');
-    let adminList: AdminProfile[] = [];
-    if (savedAdminsStr) {
-      try { adminList = JSON.parse(savedAdminsStr); } catch (e) { adminList = []; }
-    }
-    const adminIndex = adminList.findIndex(a => a.username === 'admin');
-    if (adminIndex === -1) {
-        adminList.push({
-            username: 'admin',
-            password: '123456', 
-            phone: '0909000000',
-            role: 'super_admin',
-            name: 'Super Admin',
-            permissions: [], 
-            settings: { showFloatingMenu: true, showPopupNoti: true }
-        });
-        localStorage.setItem('sip_gym_admins_db', JSON.stringify(adminList));
-    }
-    setAdmins(adminList);
+    // --- ADMIN INITIALIZATION (SYNCED WITH FIREBASE) ---
+    dbService.subscribe('admins', (data: any) => {
+        let adminList: AdminProfile[] = [];
+        if (data) {
+            adminList = Array.isArray(data) ? data : Object.values(data);
+        }
+
+        // Nếu Firebase chưa có Admin nào, tạo mặc định và đẩy lên
+        if (adminList.length === 0) {
+            const defaultAdmin: AdminProfile = {
+                username: 'admin',
+                password: '123456', // Pass mặc định
+                phone: '0909000000',
+                role: 'super_admin',
+                name: 'Super Admin',
+                permissions: [], 
+                settings: { showFloatingMenu: true, showPopupNoti: true }
+            };
+            adminList = [defaultAdmin];
+            dbService.saveAll('admins', adminList); // Lưu ngay lên Firebase
+        }
+        
+        setAdmins(adminList);
+
+        // Update current admin session if it exists
+        const sessionStr = localStorage.getItem('admin_session');
+        if (sessionStr) {
+            const session = JSON.parse(sessionStr);
+            const updatedMe = adminList.find(a => a.username === session.username);
+            if (updatedMe) {
+                setCurrentAdmin(updatedMe);
+                localStorage.setItem('admin_session', JSON.stringify(updatedMe));
+            }
+        }
+    });
   }, []);
 
   const syncAdmins = (newAdmins: AdminProfile[]) => {
     setAdmins(newAdmins);
-    localStorage.setItem('sip_gym_admins_db', JSON.stringify(newAdmins));
+    dbService.saveAll('admins', newAdmins); // Lưu thẳng lên Firebase
     if (currentAdmin) {
       const updatedMe = newAdmins.find(a => a.username === currentAdmin.username);
       if (updatedMe) {
@@ -460,8 +476,6 @@ const AppContent: React.FC = () => {
     if (updatedUser.referralBonusAvailable) updatedUser.referralBonusAvailable = false;
     else if (updatedUser.referredBy && !updatedUser.hasUsedReferralDiscount) updatedUser.hasUsedReferralDiscount = true;
 
-    // Use Voucher Logic: Remove if single-use (Optional, current requirement implies re-usable or not specified, assumed multi-use unless specific)
-    
     const newUsers = allUsers.map(u => u.phone === currentUser.phone ? updatedUser : u);
     syncDB(newUsers);
     setPopupNotification({ title: 'Đăng ký thành công', msg: 'Gói tập đang chờ Admin duyệt.' });
