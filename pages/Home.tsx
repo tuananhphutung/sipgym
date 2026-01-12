@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
 import QuickNav from '../components/QuickNav';
-import PackageSection from '../components/PackageSection'; // New Component
+import PackageSection from '../components/PackageSection'; 
 import PTPackageSection from '../components/PTPackageSection';
 import WeatherWidget from '../components/WeatherWidget';
 import { UserPlus, ShieldCheck } from 'lucide-react';
@@ -20,7 +20,8 @@ interface HomeProps {
   vouchers: VoucherItem[]; 
   appLogo?: string;
   heroImage?: string; 
-  heroVideo?: string; // New Prop
+  heroVideo?: string; 
+  heroMediaType?: 'image' | 'video';
   heroTitle?: string;
   heroSubtitle?: string;
   heroOverlayText?: string;
@@ -36,7 +37,7 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ 
   user, promotions, trainers, programs, packages, ptPackages, vouchers, 
-  appLogo, heroImage, heroVideo, heroTitle, heroSubtitle, heroOverlayText, heroOverlaySub,
+  appLogo, heroImage, heroVideo, heroMediaType, heroTitle, heroSubtitle, heroOverlayText, heroOverlaySub,
   onLogout, onUpdateSubscription, onUpdateUser, onRegisterPT, allUsers,
   bookings, onUpdateBookings
 }) => {
@@ -58,7 +59,7 @@ const Home: React.FC<HomeProps> = ({
   return (
     <div className="animate-in fade-in duration-500 relative pb-10">
       
-      {/* Top Logo & Slogan Area - Restored & Styled */}
+      {/* Top Logo & Slogan Area */}
       <div className="flex flex-col items-center justify-center pt-8 pb-4">
          <div className="w-20 h-20 bg-white rounded-full shadow-xl flex items-center justify-center border-4 border-orange-50 mb-3 relative z-10 transform hover:scale-105 transition-transform duration-300">
             <img src={appLogo} className="w-14 h-14 object-contain" alt="Logo" />
@@ -80,7 +81,6 @@ const Home: React.FC<HomeProps> = ({
 
       <Header user={user} onLogout={onLogout} onUpdateUser={onUpdateUser} allUsers={allUsers} />
       
-      {/* Weather Widget Section - Compact */}
       <div className="px-6 mt-1 mb-2">
          <WeatherWidget />
       </div>
@@ -88,6 +88,7 @@ const Home: React.FC<HomeProps> = ({
       <Hero 
         image={heroImage} 
         video={heroVideo}
+        mediaType={heroMediaType}
         title={heroTitle} 
         subtitle={heroSubtitle}
         overlayText={heroOverlayText}
@@ -127,7 +128,7 @@ const Home: React.FC<HomeProps> = ({
         </div>
       )}
 
-      {/* Main Packages Display - Directly on Home */}
+      {/* Main Packages Display */}
       <PackageSection 
          packages={packages} 
          onUpdateSubscription={onUpdateSubscription}
@@ -146,10 +147,9 @@ const Home: React.FC<HomeProps> = ({
         ptPackages={ptPackages} 
         user={user}
         onRegisterPT={onRegisterPT}
-        onOpenAuth={() => {}} // Not needed as flow forces login first
+        onOpenAuth={() => {}} 
       />
       
-      {/* Temporary Admin Login Button */}
       <div className="px-6 mt-8 flex justify-center">
          <button 
            onClick={() => navigate('/admin')}

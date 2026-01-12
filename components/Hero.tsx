@@ -4,13 +4,14 @@ import React from 'react';
 interface HeroProps {
   image?: string;
   video?: string;
+  mediaType?: 'image' | 'video'; // New prop
   title?: string;
   subtitle?: string;
   overlayText?: string;
   overlaySub?: string;
 }
 
-const Hero: React.FC<HeroProps> = ({ image, video, title, subtitle, overlayText, overlaySub }) => {
+const Hero: React.FC<HeroProps> = ({ image, video, mediaType = 'image', title, subtitle, overlayText, overlaySub }) => {
   const bgImage = image || "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600";
   const ovText = overlayText || "Thay đổi bản thân";
   const ovSub = overlaySub || "Tại Sip Gym Nhà Bè";
@@ -19,7 +20,7 @@ const Hero: React.FC<HeroProps> = ({ image, video, title, subtitle, overlayText,
     <div className="relative px-4 mt-2">
       {/* Full Square Hero Image Optimized for App with Smaller Radius */}
       <div className="w-full aspect-[4/3] relative rounded-[20px] overflow-hidden shadow-lg bg-black">
-         {video ? (
+         {mediaType === 'video' && video ? (
             <video 
                 src={video}
                 className="w-full h-full object-cover"

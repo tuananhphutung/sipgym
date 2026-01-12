@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Smartphone, Lock, ScanFace, CheckCircle2, AlertCircle, Camera, User, Mail, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { UserProfile } from '../App';
+import { faceService } from '../services/faceService';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
   const [error, setError] = useState('');
   const [targetUser, setTargetUser] = useState<UserProfile | null>(null);
   const [isScanning, setIsScanning] = useState(false); 
+  const [scanStatus, setScanStatus] = useState('Đang khởi tạo AI...');
   
   // Forgot Password States
   const [resetEmail, setResetEmail] = useState('');
@@ -46,6 +48,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
     return () => { stopCamera(); };
   }, []);
 
+  // Preload AI models when modal opens
+  useEffect(() => {
+      if (isOpen) {
+          faceService.loadModels().then(() => {
+              console.log("AI Ready for Login");
+          });
+      }
+  }, [isOpen]);
+
   useEffect(() => {
     let mounted = true;
     const initCamera = async () => {
@@ -59,6 +70,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
           }
           streamRef.current = stream;
           if (videoRef.current) videoRef.current.srcObject = stream;
+          setScanStatus("Sẵn sàng quét...");
         } catch (err: any) {
           console.error("Camera Error:", err);
           if (mounted) {
@@ -114,47 +126,58 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
     }
   };
   
+  // ... (Forgot password handlers remain same)
   const handleForgotRequest = (e: React.FormEvent) => {
      e.preventDefault();
-     if (!resetEmail.includes('@')) {
-         setError("Email không hợp lệ");
-         return;
-     }
-     // Mock sending email
+     if (!resetEmail.includes('@')) { setError("Email không hợp lệ"); return; }
      alert(`Mã xác nhận đã được gửi đến ${resetEmail} (Mã giả lập: 123456)`);
      setStep('reset_new_pass');
   };
   
   const handleResetConfirm = (e: React.FormEvent) => {
      e.preventDefault();
-     if (resetCode !== '123456') {
-         setError("Mã xác nhận không đúng (Dùng 123456)");
-         return;
-     }
-     if (newPassword.length < 6) {
-         setError("Mật khẩu phải từ 6 ký tự");
-         return;
-     }
+     if (resetCode !== '123456') { setError("Mã xác nhận không đúng (Dùng 123456)"); return; }
+     if (newPassword.length < 6) { setError("Mật khẩu phải từ 6 ký tự"); return; }
      if (targetUser && onResetPassword) {
          onResetPassword(targetUser.phone, newPassword);
          alert("Đổi mật khẩu thành công! Vui lòng đăng nhập lại.");
-         setStep('password');
-         setPassword('');
+         setStep('password'); setPassword('');
      }
   };
 
-  const verifyFace = () => {
+  const verifyFace = async () => {
+    if (!videoRef.current || !targetUser?.faceData) return;
+    
     setIsScanning(true);
-    setTimeout(() => {
-        stopCamera();
-        setIsCameraActive(false);
-        setIsScanning(false);
-        if (targetUser && targetUser.faceData) {
-            onLoginSuccess(targetUser);
+    setScanStatus("Đang phân tích khuôn mặt...");
+    setError("");
+
+    try {
+        // Thực hiện so sánh AI thật sự
+        const result = await faceService.compareFaces(videoRef.current, targetUser.faceData);
+        
+        console.log("Kết quả so sánh AI:", result);
+
+        if (result.match) {
+            setScanStatus(`Chính xác! (Độ khớp: ${Math.round((1 - result.distance) * 100)}%)`);
+            // Delay slighty to show success message
+            setTimeout(() => {
+                stopCamera();
+                setIsCameraActive(false);
+                setIsScanning(false);
+                onLoginSuccess(targetUser);
+            }, 1000);
         } else {
-            setError("Không nhận diện được khuôn mặt. Vui lòng thử lại.");
+            setScanStatus("Không khớp!");
+            setError("Khuôn mặt không khớp với dữ liệu đã đăng ký.");
+            setIsScanning(false);
         }
-    }, 1500); 
+    } catch (err: any) {
+        console.error(err);
+        setScanStatus("Lỗi");
+        setError(err.message || "Không thể nhận diện. Hãy thử lại nơi đủ sáng.");
+        setIsScanning(false);
+    }
   };
 
   const handleClose = () => {
@@ -174,10 +197,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center px-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-in fade-in duration-300">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
       
-      <div className="relative w-full max-w-[400px] bg-white rounded-t-[32px] sm:rounded-[32px] p-8 shadow-2xl animate-in slide-in-from-bottom-10 duration-500">
+      <div className="relative w-full max-w-[400px] bg-white rounded-[32px] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
         <button onClick={handleClose} className="absolute top-6 right-6 p-2 hover:bg-gray-100 rounded-full transition-colors">
           <X className="w-6 h-6 text-gray-400" />
         </button>
@@ -206,6 +229,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
           </>
         )}
 
+        {/* ... (Register details step remains same) ... */}
         {step === 'register_details' && (
            <>
             <div className="flex justify-center mb-6">
@@ -234,6 +258,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
            </>
         )}
 
+        {/* ... (Password step remains same) ... */}
         {step === 'password' && (
            <>
             <div className="flex justify-center mb-6">
@@ -273,6 +298,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
            </>
         )}
         
+        {/* ... (Forgot Password steps) ... */}
         {step === 'forgot_password' && (
             <>
                 <div className="flex justify-center mb-6">
@@ -336,10 +362,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
             </>
         )}
 
+        {/* --- FACE ID STEP UPDATED --- */}
         {step === 'face' && (
            <>
              <h2 className="text-xl font-black text-center text-gray-800 mb-4">Quét Khuôn Mặt</h2>
-             <div className="relative w-full aspect-square bg-black rounded-3xl overflow-hidden mb-4 border-4 border-[#FF6B00]">
+             <div className="relative w-full aspect-square bg-black rounded-[40px] overflow-hidden mb-4 border-4 border-[#FF6B00] shadow-2xl">
                 <video 
                    ref={videoRef} 
                    autoPlay 
@@ -348,19 +375,28 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
                    className={`w-full h-full object-cover transform scale-x-[-1] ${isCameraActive ? 'opacity-100' : 'opacity-0'}`} 
                 />
                 
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                   <div className={`w-48 h-64 border-2 border-white/50 rounded-[40%] relative overflow-hidden`}>
-                      {isScanning && <div className="absolute top-0 left-0 w-full h-1 bg-[#FF6B00] shadow-[0_0_10px_#FF6B00] animate-[scan_1.5s_linear_infinite]"></div>}
-                   </div>
+                {/* Biometric Scanning Overlay */}
+                <div className="absolute inset-0 pointer-events-none">
+                   {/* Grid */}
+                   <div className="absolute inset-0 opacity-30" style={{
+                      backgroundImage: 'linear-gradient(#FF6B00 1px, transparent 1px), linear-gradient(90deg, #FF6B00 1px, transparent 1px)',
+                      backgroundSize: '40px 40px'
+                   }}></div>
+                   
+                   {/* Scanning Bar */}
+                   {isScanning && (
+                       <div className="absolute top-0 left-0 w-full h-2 bg-[#FF6B00] shadow-[0_0_20px_#FF6B00] animate-[scan_1.5s_linear_infinite]"></div>
+                   )}
+                   
+                   {/* Center Focus Area */}
+                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-64 border-2 border-white/40 rounded-[35%]"></div>
+                   
+                   {/* Tech Decor Corners */}
+                   <div className="absolute top-6 left-6 w-6 h-6 border-t-2 border-l-2 border-[#FF6B00]"></div>
+                   <div className="absolute top-6 right-6 w-6 h-6 border-t-2 border-r-2 border-[#FF6B00]"></div>
+                   <div className="absolute bottom-6 left-6 w-6 h-6 border-b-2 border-l-2 border-[#FF6B00]"></div>
+                   <div className="absolute bottom-6 right-6 w-6 h-6 border-b-2 border-r-2 border-[#FF6B00]"></div>
                 </div>
-                <style>{`
-                  @keyframes scan {
-                    0% { top: 0%; opacity: 0; }
-                    10% { opacity: 1; }
-                    90% { opacity: 1; }
-                    100% { top: 100%; opacity: 0; }
-                  }
-                `}</style>
              </div>
              
              {error ? (
@@ -372,13 +408,16 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, allUsers, onLogi
                    </div>
                 </div>
              ) : (
-                <button 
-                  onClick={verifyFace} 
-                  disabled={isScanning}
-                  className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                   {isScanning ? <span className="animate-pulse">Đang xác thực...</span> : <><ScanFace className="w-6 h-6" /> Quét Ngay</>}
-                </button>
+                <div className="w-full space-y-2">
+                    <p className="text-center text-xs font-bold text-gray-500 uppercase tracking-widest">{scanStatus}</p>
+                    <button 
+                      onClick={verifyFace} 
+                      disabled={isScanning}
+                      className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                       {isScanning ? <span className="animate-pulse">Đang AI Phân Tích...</span> : <><ScanFace className="w-6 h-6" /> Quét Ngay</>}
+                    </button>
+                </div>
              )}
            </>
         )}

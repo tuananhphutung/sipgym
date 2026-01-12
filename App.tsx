@@ -8,7 +8,7 @@ import Voucher from './pages/Voucher';
 import Support from './pages/Support';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
-import AuthPage from './components/AuthPage'; // New Auth Page
+import AuthPage from './components/AuthPage'; 
 import BottomNav from './components/BottomNav';
 import SetupPasswordModal from './components/SetupPasswordModal';
 import PWAPrompt from './components/PWAPrompt';
@@ -26,6 +26,8 @@ export interface PackageItem {
   categoryId: 'gym' | 'groupx';
   name: string;
   price: number;
+  originalPrice?: number; // New: Giá gốc để làm sale
+  bonusDays?: number; // New: Ngày tặng thêm
   image: string;
   description?: string;
   duration: number; // Number of months
@@ -62,6 +64,7 @@ export interface Subscription {
   voucherCode?: string | null;
   status: 'Pending' | 'Active' | 'Expired' | 'Rejected' | 'Pending Preservation' | 'Preserved';
   packageImage?: string;
+  bonusDays?: number; // Store bonus days given at purchase
 }
 
 export interface PTSubscription {
@@ -116,9 +119,9 @@ export interface UserProfile {
   realName?: string; 
   name?: string; 
   email?: string; 
-  address?: string; // New
-  securityQuestion?: string; // New
-  securityAnswer?: string; // New
+  address?: string; 
+  securityQuestion?: string; 
+  securityAnswer?: string; 
   
   avatar: string | null;
   subscription: Subscription | null;
@@ -127,9 +130,9 @@ export interface UserProfile {
   notifications: Notification[];
   messages: ChatMessage[]; 
   trainingDays: string[];
-  savedVouchers: string[]; // List of voucher IDs owned
+  savedVouchers: string[]; 
   
-  accountStatus?: 'Active'; // Always Active after registration per request
+  accountStatus?: 'Active'; 
 
   referredBy?: string;
   referralBonusAvailable?: boolean;
@@ -145,7 +148,7 @@ export type AdminPermission =
   | 'send_notification' | 'edit_user_settings' | 'manage_user' | 'chat_user'
   | 'manage_packages' | 'manage_pt_packages' | 'add_pt' | 'view_user_list'
   | 'manage_promo' | 'manage_voucher' | 'view_schedule' | 'manage_app_interface' | 'manage_bookings'
-  | 'create_qr'; // New Permission
+  | 'create_qr'; 
 
 export interface AdminProfile {
   username: string;
@@ -207,7 +210,8 @@ const AppContent: React.FC = () => {
   // App Settings State
   const [appLogo, setAppLogo] = useState<string>('https://phukienlimousine.vn/wp-content/uploads/2025/12/LOGO_SIP_GYM_pages-to-jpg-0001-removebg-preview.png');
   const [heroImage, setHeroImage] = useState<string>('https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&q=80&w=600');
-  const [heroVideo, setHeroVideo] = useState<string>(''); // New Video State
+  const [heroVideo, setHeroVideo] = useState<string>(''); 
+  const [heroMediaType, setHeroMediaType] = useState<'image' | 'video'>('image'); // New State
   const [heroTitle, setHeroTitle] = useState<string>('CÂU LẠC\nBỘ\nGYM');
   const [heroSubtitle, setHeroSubtitle] = useState<string>('GYM CHO MỌI NGƯỜI');
   const [heroOverlayText, setHeroOverlayText] = useState<string>('THAY ĐỔI BẢN THÂN');
@@ -221,16 +225,11 @@ const AppContent: React.FC = () => {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   
-  // New Package Structure
   const [packages, setPackages] = useState<PackageItem[]>([
-    // Gym Packages
-    { id: '1m', categoryId: 'gym', name: '1 Tháng', price: 500000, duration: 1, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300', description: 'Tập gym không giới hạn 1 tháng.' },
-    { id: '3m', categoryId: 'gym', name: '3 Tháng', price: 1350000, duration: 3, image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=300', description: 'Tiết kiệm 10%.' },
-    { id: '6m', categoryId: 'gym', name: '6 Tháng', price: 2500000, duration: 6, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300', description: 'Tặng thêm 15 ngày.' },
-    { id: '1y', categoryId: 'gym', name: '1 Năm', price: 4500000, duration: 12, image: 'https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?auto=format&fit=crop&q=80&w=300', description: 'Cam kết thay đổi hình thể.' },
-    // Group X Packages
-    { id: 'yoga', categoryId: 'groupx', name: 'Yoga', price: 600000, duration: 1, image: 'https://images.unsplash.com/photo-1544367563-12123d8959bd?auto=format&fit=crop&q=80&w=300', description: 'Lớp Yoga thư giãn.' },
-    { id: 'aerobic', categoryId: 'groupx', name: 'Aerobic', price: 550000, duration: 1, image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&q=80&w=300', description: 'Nhảy Aerobic sôi động.' },
+    { id: '1m', categoryId: 'gym', name: '1 Tháng', price: 500000, originalPrice: 600000, duration: 1, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300', description: 'Tập gym không giới hạn 1 tháng.', bonusDays: 0 },
+    { id: '3m', categoryId: 'gym', name: '3 Tháng', price: 1350000, originalPrice: 1500000, duration: 3, image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=300', description: 'Tiết kiệm 10%.', bonusDays: 5 },
+    { id: '6m', categoryId: 'gym', name: '6 Tháng', price: 2500000, originalPrice: 3000000, duration: 6, image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=300', description: 'Tặng thêm 15 ngày.', bonusDays: 15 },
+    { id: 'yoga', categoryId: 'groupx', name: 'Yoga', price: 600000, duration: 1, image: 'https://images.unsplash.com/photo-1544367563-12123d8959bd?auto=format&fit=crop&q=80&w=300', description: 'Lớp Yoga thư giãn.', bonusDays: 0 },
   ]);
 
   const [ptPackages, setPTPackages] = useState<PTPackage[]>([
@@ -241,7 +240,6 @@ const AppContent: React.FC = () => {
   const [isSetupPassOpen, setIsSetupPassOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true); 
   
-  // Global Popup Notification State
   const [popupNotification, setPopupNotification] = useState<{title: string, msg: string} | null>(null);
 
   const location = useLocation();
@@ -250,18 +248,15 @@ const AppContent: React.FC = () => {
   const isAdminPath = location.pathname.startsWith('/admin');
 
   useEffect(() => {
-    // --- ADMIN INITIALIZATION (SYNCED WITH FIREBASE) ---
     dbService.subscribe('admins', (data: any) => {
         let adminList: AdminProfile[] = [];
         if (data) {
             adminList = Array.isArray(data) ? data : Object.values(data);
         }
-
-        // Nếu Firebase chưa có Admin nào, tạo mặc định và đẩy lên
         if (adminList.length === 0) {
             const defaultAdmin: AdminProfile = {
                 username: 'admin',
-                password: '123456', // Pass mặc định
+                password: '123456',
                 phone: '0909000000',
                 role: 'super_admin',
                 name: 'Super Admin',
@@ -269,12 +264,11 @@ const AppContent: React.FC = () => {
                 settings: { showFloatingMenu: true, showPopupNoti: true }
             };
             adminList = [defaultAdmin];
-            dbService.saveAll('admins', adminList); // Lưu ngay lên Firebase
+            dbService.saveAll('admins', adminList);
         }
         
         setAdmins(adminList);
 
-        // Update current admin session if it exists
         const sessionStr = localStorage.getItem('admin_session');
         if (sessionStr) {
             const session = JSON.parse(sessionStr);
@@ -289,7 +283,7 @@ const AppContent: React.FC = () => {
 
   const syncAdmins = (newAdmins: AdminProfile[]) => {
     setAdmins(newAdmins);
-    dbService.saveAll('admins', newAdmins); // Lưu thẳng lên Firebase
+    dbService.saveAll('admins', newAdmins); 
     if (currentAdmin) {
       const updatedMe = newAdmins.find(a => a.username === currentAdmin.username);
       if (updatedMe) {
@@ -311,7 +305,7 @@ const AppContent: React.FC = () => {
         trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : []),
         savedVouchers: Array.isArray(u.savedVouchers) ? u.savedVouchers : [],
         settings: u.settings || { popupNotification: true },
-        accountStatus: 'Active' // Force Active for all users per request
+        accountStatus: 'Active' 
       }));
 
       const loggedPhone = localStorage.getItem('sip_gym_logged_phone');
@@ -356,6 +350,7 @@ const AppContent: React.FC = () => {
             if (data.appLogo) setAppLogo(data.appLogo);
             if (data.heroImage) setHeroImage(data.heroImage);
             if (data.heroVideo) setHeroVideo(data.heroVideo);
+            if (data.heroMediaType) setHeroMediaType(data.heroMediaType); // Sync media type
             if (data.heroTitle) setHeroTitle(data.heroTitle);
             if (data.heroSubtitle) setHeroSubtitle(data.heroSubtitle);
             if (data.heroOverlayText) setHeroOverlayText(data.heroOverlayText);
@@ -416,10 +411,11 @@ const AppContent: React.FC = () => {
       dbService.saveAll('bookings', newBookings);
   };
   
-  const syncAppConfig = (config: { appLogo: string, heroImage: string, heroVideo?: string, heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string }) => {
+  const syncAppConfig = (config: { appLogo: string, heroImage: string, heroVideo?: string, heroMediaType: 'image'|'video', heroTitle: string, heroSubtitle: string, heroOverlayText?: string, heroOverlaySub?: string }) => {
       setAppLogo(config.appLogo);
       setHeroImage(config.heroImage);
       if(config.heroVideo) setHeroVideo(config.heroVideo);
+      setHeroMediaType(config.heroMediaType);
       setHeroTitle(config.heroTitle);
       setHeroSubtitle(config.heroSubtitle);
       if(config.heroOverlayText) setHeroOverlayText(config.heroOverlayText);
@@ -456,7 +452,8 @@ const AppContent: React.FC = () => {
       status: 'Pending', 
       packageImage: pkg?.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=300',
       paymentMethod: method,
-      voucherCode: voucherCode || null // Sanitized voucherCode
+      voucherCode: voucherCode || null,
+      bonusDays: pkg?.bonusDays || 0
     };
     let updatedUser = { ...currentUser, subscription: newSubscription };
     
@@ -553,6 +550,7 @@ const AppContent: React.FC = () => {
                   appLogo={appLogo}
                   heroImage={heroImage}
                   heroVideo={heroVideo}
+                  heroMediaType={heroMediaType}
                   heroTitle={heroTitle}
                   heroSubtitle={heroSubtitle}
                   heroOverlayText={heroOverlayText}

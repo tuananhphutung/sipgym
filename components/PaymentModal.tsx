@@ -123,10 +123,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center px-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-in fade-in duration-300">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
       
-      <div className="relative w-full max-w-[430px] bg-white rounded-t-[40px] sm:rounded-[40px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-20">
+      <div className="relative w-full max-w-[430px] bg-white rounded-[24px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
         <div className="p-5 flex justify-between items-center border-b border-gray-50 bg-white sticky top-0 z-10">
           <h2 className="text-lg font-black text-gray-800 uppercase italic tracking-tight">
             {step === 'voucher' && 'Xác Nhận & Ưu Đãi'}

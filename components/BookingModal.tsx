@@ -68,10 +68,10 @@ const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose, trainer, u
   const bookingsOnDay = selectedDate ? bookings.filter(b => b.trainerId === trainer.id && b.date === selectedDate && b.status !== 'Rejected') : [];
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-end justify-center sm:items-center px-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 animate-in fade-in duration-300">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
       
-      <div className="relative w-full max-w-[430px] bg-white rounded-t-[40px] sm:rounded-[40px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-20">
+      <div className="relative w-full max-w-[430px] bg-white rounded-[24px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-5 flex justify-between items-center border-b border-gray-50 bg-white sticky top-0 z-20">
           <div className="flex items-center gap-3">

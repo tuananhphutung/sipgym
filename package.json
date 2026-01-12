@@ -15,7 +15,9 @@
     "react-router-dom": "^7.11.0",
     "lucide-react": "^0.562.0",
     "firebase": "^12.7.0",
-    "react-qr-code": "2.0.15"
+    "react-qr-code": "2.0.15",
+    "react-easy-crop": "5.0.7",
+    "tslib": "2.6.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
