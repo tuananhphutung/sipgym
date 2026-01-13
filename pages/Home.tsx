@@ -7,7 +7,7 @@ import QuickNav from '../components/QuickNav';
 import PackageSection from '../components/PackageSection'; 
 import PTPackageSection from '../components/PTPackageSection';
 import WeatherWidget from '../components/WeatherWidget';
-import { UserPlus, ShieldCheck } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { UserProfile, Promotion, Trainer, TrainingProgram, PackageItem, PTPackage, VoucherItem, Booking } from '../App';
 
 interface HomeProps {
@@ -150,16 +150,7 @@ const Home: React.FC<HomeProps> = ({
         onOpenAuth={() => {}} 
       />
       
-      <div className="px-6 mt-8 flex justify-center">
-         <button 
-           onClick={() => navigate('/admin')}
-           className="bg-gray-100 text-gray-400 p-2 rounded-full flex items-center gap-2 hover:bg-gray-200 hover:text-gray-600 transition-all active:scale-90"
-           title="Admin Login"
-         >
-            <ShieldCheck className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase">Admin</span>
-         </button>
-      </div>
+      {/* Admin Button Removed per request to prevent accidental access */}
 
       <div className="h-10"></div>
     </div>
