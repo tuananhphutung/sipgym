@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
@@ -112,6 +113,7 @@ export interface UserProfile {
   phone: string;
   password?: string;
   faceData?: string | null;
+  faceDescriptor?: number[]; // Dữ liệu khuôn mặt dạng số để so khớp nhanh
   loginMethod?: 'password' | 'face';
   gender?: 'Nam' | 'Nữ' | 'Khác'; 
   
@@ -303,6 +305,7 @@ const AppContent: React.FC = () => {
         messages: Array.isArray(u.messages) ? u.messages : (u.messages ? Object.values(u.messages) : []),
         trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : []),
         savedVouchers: Array.isArray(u.savedVouchers) ? u.savedVouchers : [],
+        faceDescriptor: Array.isArray(u.faceDescriptor) ? u.faceDescriptor : undefined, // Ensure faceDescriptor is array
         settings: u.settings || { popupNotification: true },
         accountStatus: u.accountStatus || 'Active' 
       }));

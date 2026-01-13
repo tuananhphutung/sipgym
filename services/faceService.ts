@@ -32,9 +32,9 @@ export const faceService = {
   getFaceDescriptor: async (input: HTMLVideoElement | HTMLImageElement) => {
     if (!isModelLoaded) await faceService.loadModels();
 
-    // Cấu hình detect: inputSize càng nhỏ càng nhanh nhưng kém chính xác. 
-    // 224, 320, 416, 512, 608. 320 là mức cân bằng cho mobile.
-    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+    // OPTIMIZATION: Reduce inputSize to 224 (MobileNet default) for faster processing
+    // scoreThreshold 0.5 ensures we only get reasonably confident faces
+    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
 
     const detection = await faceapi.detectSingleFace(input, options)
       .withFaceLandmarks()
@@ -90,31 +90,41 @@ export const faceService = {
     }
   },
 
-  // 5. Tìm người phù hợp nhất trong danh sách (1:N Matching)
+  // 5. Tìm người phù hợp nhất trong danh sách (1:N Matching) - OPTIMIZED
   findBestMatch: async (videoInput: HTMLVideoElement, users: any[]): Promise<{ user: any | null, matchPercentage: number }> => {
     try {
+        // Detect face from Camera only ONCE
         const currentDescriptor = await faceService.getFaceDescriptor(videoInput);
         if (!currentDescriptor) return { user: null, matchPercentage: 0 };
 
         let bestMatchUser = null;
         let bestDistance = 1.0; // Khởi tạo khoảng cách lớn nhất (sai số lớn nhất)
 
-        // Lọc ra user có faceData
-        const usersWithFace = users.filter(u => u.faceData);
+        // Lọc ra user có faceData hoặc faceDescriptor
+        const usersWithFace = users.filter(u => u.faceData || u.faceDescriptor);
 
-        // Duyệt qua từng user (Lưu ý: Trong thực tế nếu >1000 user cần dùng thuật toán tối ưu hơn hoặc xử lý server)
+        // Duyệt qua từng user
         for (const user of usersWithFace) {
             try {
-                // Tối ưu: Có thể cache descriptor của user lúc login để không phải convert lại base64 mỗi lần
-                const storedImage = await faceService.createImageFromBase64(user.faceData);
-                const storedDescriptor = await faceService.getFaceDescriptor(storedImage);
-                
-                if (storedDescriptor) {
-                    const distance = faceapi.euclideanDistance(currentDescriptor, storedDescriptor);
-                    if (distance < bestDistance) {
-                        bestDistance = distance;
-                        bestMatchUser = user;
+                let distance = 1.0;
+
+                // FAST PATH: Use pre-calculated descriptor if available
+                if (user.faceDescriptor && Array.isArray(user.faceDescriptor)) {
+                    const storedDescriptor = new Float32Array(user.faceDescriptor);
+                    distance = faceapi.euclideanDistance(currentDescriptor, storedDescriptor);
+                } 
+                // SLOW PATH: Fallback to image detection (Legacy users)
+                else if (user.faceData) {
+                    const storedImage = await faceService.createImageFromBase64(user.faceData);
+                    const storedDescriptor = await faceService.getFaceDescriptor(storedImage);
+                    if (storedDescriptor) {
+                        distance = faceapi.euclideanDistance(currentDescriptor, storedDescriptor);
                     }
+                }
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestMatchUser = user;
                 }
             } catch (e) {
                 continue;
@@ -122,23 +132,16 @@ export const faceService = {
         }
 
         // Logic 90%: 
-        // Trong FaceAPI, distance 0.0 là giống hệt, 0.6 là ngưỡng mặc định.
-        // Để đạt 90%, ta yêu cầu distance < 0.4 (Khá khắt khe).
-        // Công thức giả định % khớp: (1 - distance) * 100. (Tuy nhiên distance có thể > 1 nên cần kẹp).
-        
-        // Ta dùng ngưỡng cứng 0.45 cho trải nghiệm tốt
+        // 0.45 threshold
         const STRICT_THRESHOLD = 0.45; 
         
-        // Tính % hiển thị cho vui mắt user (Logic tương đối)
-        // Nếu distance = 0 -> 100%
-        // Nếu distance = 0.6 -> 40% (Fail)
         let matchPercentage = Math.round(Math.max(0, (1 - bestDistance)) * 100);
 
         if (bestDistance < STRICT_THRESHOLD && bestMatchUser) {
             return { user: bestMatchUser, matchPercentage };
         }
 
-        return { user: null, matchPercentage: matchPercentage > 60 ? matchPercentage : 0 }; // Trả về % nếu có tiềm năng
+        return { user: null, matchPercentage: matchPercentage > 60 ? matchPercentage : 0 }; 
 
     } catch (e) {
         console.error(e);

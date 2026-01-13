@@ -1,4 +1,3 @@
-// ... (imports)
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit2, Package, PlusCircle, RefreshCw, ClipboardList, LogOut, ShieldCheck, X, Camera, PauseCircle, Users, Lock, ScanFace, UserCheck, Bell, ChevronRight, Settings, QrCode } from 'lucide-react';
@@ -20,7 +19,6 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateUser, allUsers, packages, vouchers }) => {
-  // ... (keep all hooks and logic the same until render)
   const navigate = useNavigate();
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
@@ -102,7 +100,6 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
     return null;
   }
 
-  // ... (keep handle functions same)
   const handleEditOpen = () => {
     setEditName(user.name || `Member ${user.phone.slice(-4)}`);
     setEditAvatar(user.avatar || '');
@@ -134,8 +131,9 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
      if (videoRef.current) {
        setScanStatus("Đang kiểm tra khuôn mặt...");
        
-       // AI Check: Ensure there is a face
+       // AI Check: Ensure there is a face and GET DESCRIPTOR
        try {
+           // OPTIMIZATION: Get descriptor right here to save later
            const faceDescriptor = await faceService.getFaceDescriptor(videoRef.current);
            
            if (!faceDescriptor) {
@@ -158,9 +156,16 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateSubscription, onUpdateU
 
            setIsFaceScanning(false);
            
-           const newUsers = allUsers.map(u => u.phone === user.phone ? { ...u, faceData: base64Image, loginMethod: 'face' as const } : u);
+           // SAVE BOTH IMAGE AND DESCRIPTOR (Converted to standard Array)
+           const newUsers = allUsers.map(u => u.phone === user.phone ? { 
+               ...u, 
+               faceData: base64Image,
+               faceDescriptor: Array.from(faceDescriptor) as number[], // Save float32array as normal array
+               loginMethod: 'face' as const 
+           } : u);
+           
            onUpdateUser(newUsers);
-           alert("✅ Đã nhận diện và lưu dữ liệu Face ID thành công!");
+           alert("✅ Đã nhận diện và lưu dữ liệu Face ID thành công! Đăng nhập sẽ rất nhanh.");
            setActiveSetting(null);
        } catch (e) {
            console.error(e);
