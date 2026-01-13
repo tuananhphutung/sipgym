@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
@@ -132,7 +131,7 @@ export interface UserProfile {
   trainingDays: string[];
   savedVouchers: string[]; 
   
-  accountStatus?: 'Active'; 
+  accountStatus?: 'Active' | 'Pending'; 
 
   referredBy?: string;
   referralBonusAvailable?: boolean;
@@ -305,7 +304,7 @@ const AppContent: React.FC = () => {
         trainingDays: Array.isArray(u.trainingDays) ? u.trainingDays : (u.trainingDays ? Object.values(u.trainingDays) : []),
         savedVouchers: Array.isArray(u.savedVouchers) ? u.savedVouchers : [],
         settings: u.settings || { popupNotification: true },
-        accountStatus: 'Active' 
+        accountStatus: u.accountStatus || 'Active' 
       }));
 
       const loggedPhone = localStorage.getItem('sip_gym_logged_phone');

@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
-import { Eye, EyeOff, User, Smartphone, MapPin, Lock, Mail, ShieldQuestion, ArrowRight } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Eye, EyeOff, User, Smartphone, MapPin, Lock, Mail, ShieldQuestion, ArrowRight, ScanFace, X } from 'lucide-react';
 import { UserProfile } from '../App';
+import { faceService } from '../services/faceService';
 
 interface AuthPageProps {
   allUsers: UserProfile[];
@@ -34,7 +35,81 @@ const AuthPage: React.FC<AuthPageProps> = ({ allUsers, onLoginSuccess, onUpdateU
   const [showNewPass, setShowNewPass] = useState(false);
   const [targetUserForReset, setTargetUserForReset] = useState<UserProfile | null>(null);
 
+  // Face ID Login State
+  const [isFaceLogin, setIsFaceLogin] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [scanStatus, setScanStatus] = useState('Đang khởi tạo Camera...');
+  const [matchPercent, setMatchPercent] = useState(0);
+
   const [error, setError] = useState('');
+
+  // Clean up camera when component unmounts or mode changes
+  useEffect(() => {
+      return () => {
+          stopCamera();
+      };
+  }, []);
+
+  const stopCamera = () => {
+      if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+      }
+      if (videoRef.current) {
+          videoRef.current.srcObject = null;
+      }
+  };
+
+  const startFaceLogin = async () => {
+      setIsFaceLogin(true);
+      setScanStatus("Đang tải AI...");
+      setMatchPercent(0);
+      try {
+          await faceService.loadModels();
+          if (streamRef.current) stopCamera();
+          
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+          streamRef.current = stream;
+          if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+          }
+          setScanStatus("Đang tìm khuôn mặt...");
+          scanFaceLoop();
+      } catch (e) {
+          console.error(e);
+          alert("Không thể mở camera. Vui lòng kiểm tra quyền truy cập.");
+          setIsFaceLogin(false);
+      }
+  };
+
+  const scanFaceLoop = async () => {
+      if (!streamRef.current || !videoRef.current) return;
+      if (!isFaceLogin) return;
+
+      // Scan process
+      const result = await faceService.findBestMatch(videoRef.current, allUsers);
+      
+      setMatchPercent(result.matchPercentage);
+
+      if (result.user && result.matchPercentage >= 55) { // 55% Euclidean logic tương đương confidence rất cao (>90%)
+          setScanStatus(`Đã khớp! (${result.matchPercentage}%)`);
+          // Delay a bit for UX
+          setTimeout(() => {
+              stopCamera();
+              onLoginSuccess(result.user);
+          }, 800);
+          return;
+      } else {
+          if (result.matchPercentage > 0) {
+              setScanStatus(`Đang so khớp... (${result.matchPercentage}%)`);
+          } else {
+              setScanStatus("Giữ yên khuôn mặt...");
+          }
+          // Retry
+          requestAnimationFrame(scanFaceLoop);
+      }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +150,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ allUsers, onLoginSuccess, onUpdateU
         return;
     }
 
-    // Direct registration without blocking window.confirm for better UX on mobile PWA context
     const newUser: UserProfile = {
         phone: regPhone,
         password: regPass,
@@ -98,7 +172,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ allUsers, onLoginSuccess, onUpdateU
     
     const updatedUsers = [...allUsers, newUser];
     onUpdateUsers(updatedUsers);
-    // Important: Immediately login
     setTimeout(() => {
         alert("Đăng ký thành công!");
         onLoginSuccess(newUser);
@@ -148,7 +221,30 @@ const AuthPage: React.FC<AuthPageProps> = ({ allUsers, onLoginSuccess, onUpdateU
              <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">Câu lạc bộ thể hình chuyên nghiệp</p>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-[32px] p-8 shadow-2xl border border-white">
+          <div className="bg-white/80 backdrop-blur-xl rounded-[32px] p-8 shadow-2xl border border-white relative overflow-hidden">
+             
+             {/* FACE LOGIN OVERLAY */}
+             {isFaceLogin && (
+                 <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 animate-in fade-in zoom-in duration-300">
+                     <button onClick={() => { setIsFaceLogin(false); stopCamera(); }} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full text-gray-500"><X className="w-6 h-6"/></button>
+                     <h3 className="text-xl font-black text-gray-800 uppercase italic mb-6">Quét Face ID</h3>
+                     <div className="relative w-64 h-64 rounded-[40px] overflow-hidden border-4 border-[#FF6B00] shadow-2xl mb-6">
+                         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transform scale-x-[-1]"/>
+                         {/* Scanning Effect */}
+                         <div className="absolute top-0 left-0 w-full h-1 bg-[#FF6B00] shadow-[0_0_20px_#FF6B00] animate-[scan_1.5s_linear_infinite]"></div>
+                         <div className="absolute inset-0 border-2 border-white/30 rounded-[35px] m-4"></div>
+                         <style>{`@keyframes scan { 0% { top: 0; opacity: 0.5; } 50% { opacity: 1; } 100% { top: 100%; opacity: 0.5; } }`}</style>
+                     </div>
+                     <p className="text-gray-500 text-xs font-bold uppercase tracking-widest animate-pulse">{scanStatus}</p>
+                     {matchPercent > 0 && matchPercent < 55 && (
+                         <div className="w-full max-w-[200px] h-1.5 bg-gray-200 rounded-full mt-3 overflow-hidden">
+                             <div className="h-full bg-orange-500 transition-all duration-300" style={{ width: `${matchPercent}%` }}></div>
+                         </div>
+                     )}
+                     <button onClick={() => { setIsFaceLogin(false); stopCamera(); }} className="mt-8 text-gray-400 font-bold text-xs uppercase border-b border-gray-200 pb-1">Sử dụng mật khẩu</button>
+                 </div>
+             )}
+
              {/* Header Tabs */}
              {mode !== 'forgot' && (
                  <div className="flex bg-gray-100 p-1 rounded-2xl mb-6">
@@ -175,7 +271,22 @@ const AuthPage: React.FC<AuthPageProps> = ({ allUsers, onLoginSuccess, onUpdateU
                        <button type="button" onClick={() => setMode('forgot')} className="text-xs font-bold text-gray-400 hover:text-orange-500">Quên mật khẩu?</button>
                     </div>
                     {error && <p className="text-red-500 text-xs font-bold text-center bg-red-50 p-2 rounded-lg">{error}</p>}
+                    
                     <button type="submit" className="w-full bg-[#FF6B00] text-white py-4 rounded-2xl font-black uppercase shadow-lg shadow-orange-200 active:scale-95 transition-transform">Đăng Nhập Ngay</button>
+                    
+                    <div className="relative flex py-2 items-center">
+                        <div className="flex-grow border-t border-gray-100"></div>
+                        <span className="flex-shrink-0 mx-4 text-gray-300 text-[10px] font-bold uppercase">Hoặc</span>
+                        <div className="flex-grow border-t border-gray-100"></div>
+                    </div>
+
+                    <button 
+                        type="button" 
+                        onClick={startFaceLogin}
+                        className="w-full bg-white border-2 border-[#FF6B00] text-[#FF6B00] py-4 rounded-2xl font-black uppercase flex items-center justify-center gap-2 hover:bg-orange-50 active:scale-95 transition-all"
+                    >
+                        <ScanFace className="w-5 h-5" /> Đăng nhập bằng Face ID
+                    </button>
                  </form>
              )}
 

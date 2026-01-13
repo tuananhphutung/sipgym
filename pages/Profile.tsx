@@ -1,4 +1,3 @@
-
 // ... (imports)
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +12,7 @@ import { faceService } from '../services/faceService';
 
 interface ProfileProps {
   user: UserProfile | null;
-  onUpdateSubscription: (packageName: string, months: number, price: number, voucherCode?: string) => void;
+  onUpdateSubscription: (packageName: string, months: number, price: number, method: 'Cash' | 'Transfer', voucherCode?: string) => void;
   onUpdateUser: (users: UserProfile[]) => void;
   allUsers: UserProfile[];
   packages: PackageItem[];
